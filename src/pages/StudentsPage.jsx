@@ -5,12 +5,16 @@ import { useAllEntries } from '../hooks/useATLEntries'
 import PageLayout from '../components/layout/PageLayout'
 import Card, { CardHeader } from '../components/ui/Card'
 import { StatusBadge } from '../components/ui/Badge'
+import Button from '../components/ui/Button'
+import TeacherRatingModal from '../components/ui/TeacherRatingModal'
 import { ATL_CATEGORIES, ATL_CATEGORY_KEYS } from '../utils/atlFramework'
 import { average } from '../utils/helpers'
+import { Star } from 'lucide-react'
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([])
   const { entries } = useAllEntries()
+  const [ratingStudent, setRatingStudent] = useState(null)
 
   useEffect(() => {
     const unsub = subscribeToStudents(setStudents)
@@ -24,6 +28,12 @@ export default function StudentsPage() {
           <h1 className="page-title">Students</h1>
           <p className="text-sm text-slate-500 mt-0.5">{students.length} enrolled students</p>
         </div>
+
+        <TeacherRatingModal
+          open={!!ratingStudent}
+          onClose={() => setRatingStudent(null)}
+          student={ratingStudent}
+        />
 
         <div className="grid gap-4">
           {students.map((student, i) => {
@@ -60,11 +70,20 @@ export default function StudentsPage() {
                       <p className="text-xs text-slate-400">{student.email}</p>
                     </div>
                   </div>
-                  <div className="flex gap-2 text-xs text-slate-500">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="badge bg-green-50 text-green-700">{approved.length} approved</span>
                     {pending.length > 0 && (
                       <span className="badge bg-amber-50 text-amber-700">{pending.length} pending</span>
                     )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setRatingStudent(student)}
+                      className="flex items-center gap-1"
+                    >
+                      <Star size={12} />
+                      Rate
+                    </Button>
                   </div>
                 </div>
 

@@ -105,3 +105,39 @@ export async function getUser(uid) {
 export async function updateUserRole(uid, role) {
   await updateDoc(doc(db, 'users', uid), { role, updatedAt: serverTimestamp() })
 }
+
+// ─── Teacher Term Ratings ─────────────────────────────────────────────────────
+
+export async function saveTeacherRating(data) {
+  const q = query(
+    collection(db, 'teacher_term_ratings'),
+    where('studentId', '==', data.studentId),
+    where('term', '==', data.term),
+  )
+  const existing = await getDocs(q)
+  if (!existing.empty) {
+    const docId = existing.docs[0].id
+    await updateDoc(doc(db, 'teacher_term_ratings', docId), {
+      ...data,
+      updatedAt: serverTimestamp(),
+    })
+    return docId
+  }
+  const ref = await addDoc(collection(db, 'teacher_term_ratings'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export function subscribeToStudentTeacherRatings(studentId, callback) {
+  const q = query(
+    collection(db, 'teacher_term_ratings'),
+    where('studentId', '==', studentId),
+    orderBy('createdAt', 'desc'),
+  )
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  })
+}

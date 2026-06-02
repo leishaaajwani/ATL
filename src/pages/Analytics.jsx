@@ -8,8 +8,12 @@ import { LevelBadge, CategoryBadge, StatusBadge } from '../components/ui/Badge'
 import ChartContainer from '../components/charts/ChartContainer'
 import { SUBJECTS, ATL_CATEGORIES, ATL_CATEGORY_KEYS, TERMS } from '../utils/atlFramework'
 import { formatDate, groupBy } from '../utils/helpers'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Filter } from 'lucide-react'
+import { subscribeToStudentTeacherRatings } from '../firebase/firestore'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
 
 export default function Analytics() {
   const { userDoc, isTeacher } = useAuth()
@@ -35,6 +39,34 @@ export default function Analytics() {
   const students = isTeacher
     ? [...new Map(allEntries.map(e => [e.studentId, { id: e.studentId, name: e.studentName }])).values()]
     : []
+
+  // Teacher ratings for comparison
+  const [teacherRatings, setTeacherRatings] = useState([])
+  const [selectedRatingTerm, setSelectedRatingTerm] = useState(null)
+
+  const comparisonStudentId = isTeacher
+    ? (selectedStudent !== 'all' ? selectedStudent : null)
+    : userDoc?.uid
+
+  useEffect(() => {
+    if (!comparisonStudentId) { setTeacherRatings([]); return }
+    const unsub = subscribeToStudentTeacherRatings(comparisonStudentId, ratings => {
+      setTeacherRatings(ratings)
+      if (ratings.length > 0) setSelectedRatingTerm(ratings[0].term)
+    })
+    return unsub
+  }, [comparisonStudentId])
+
+  const activeTRating = teacherRatings.find(r => r.term === selectedRatingTerm)
+
+  const comparisonData = ATL_CATEGORY_KEYS.map(cat => ({
+    name: cat === 'Self-management' ? 'Self-Mgmt' : cat,
+    'Your Rating': analytics.categoryAverages[cat] > 0
+      ? parseFloat(analytics.categoryAverages[cat].toFixed(2)) : null,
+    'Teacher Rating': activeTRating?.ratings?.[cat] ?? null,
+  }))
+
+  const hasComparison = teacherRatings.length > 0
 
   const journalEntries = filtered.slice().sort((a, b) => {
     const ta = a.createdAt?.toMillis?.() ?? 0
@@ -103,6 +135,77 @@ export default function Analytics() {
           categoryAverages={analytics.categoryAverages}
           title="ATL Category Performance"
         />
+
+        {/* Teacher vs Student comparison */}
+        {(hasComparison || isTeacher) && (
+          <Card>
+            <CardHeader
+              title="Self vs Teacher Assessment"
+              subtitle={hasComparison ? `${teacherRatings.length} teacher rating(s)` : 'No teacher ratings yet'}
+            />
+            {hasComparison ? (
+              <div className="space-y-4">
+                {/* Term selector */}
+                {teacherRatings.length > 1 && (
+                  <div className="flex gap-2 flex-wrap">
+                    {teacherRatings.map(r => (
+                      <button
+                        key={r.id}
+                        onClick={() => setSelectedRatingTerm(r.term)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                          selectedRatingTerm === r.term
+                            ? 'bg-navy-700 text-white border-navy-700'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        {r.term}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={comparisonData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
+                    <YAxis domain={[0, 4]} tickCount={5} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <Tooltip
+                      formatter={(v, name) => [v !== null ? v : '—', name]}
+                      contentStyle={{ borderRadius: 12, border: '1px solid #f1f5f9', fontSize: 12 }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="Your Rating" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="Teacher Rating" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="grid grid-cols-5 gap-2 pt-2 border-t border-slate-100">
+                  {comparisonData.map(d => {
+                    const diff = d['Teacher Rating'] !== null && d['Your Rating'] !== null
+                      ? (d['Teacher Rating'] - d['Your Rating']).toFixed(1)
+                      : null
+                    return (
+                      <div key={d.name} className="text-center">
+                        <p className="text-[10px] text-slate-400 mb-1">{d.name}</p>
+                        {diff !== null && (
+                          <span className={`text-xs font-semibold ${
+                            diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-rose-500' : 'text-slate-400'
+                          }`}>
+                            {diff > 0 ? `+${diff}` : diff}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-sm text-slate-400">
+                {isTeacher
+                  ? 'Select a student and use the Students page to add a term rating.'
+                  : 'Your teacher has not submitted a rating yet.'}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Category breakdown table */}
         <Card>

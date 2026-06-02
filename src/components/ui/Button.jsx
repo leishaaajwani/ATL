@@ -5,6 +5,7 @@ const variants = {
   secondary: 'btn-secondary',
   ghost:     'btn-ghost',
   danger:    'btn-danger',
+  outline:   'border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1',
 }
 
 const sizes = {
