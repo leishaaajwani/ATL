@@ -37,6 +37,7 @@ export function AuthProvider({ children }) {
     loading,
     isStudent: userDoc?.role === 'student',
     isTeacher: userDoc?.role === 'teacher',
+    needsOnboarding: user && userDoc && !userDoc.profileCompleted,
     refreshUserDoc,
   }
 

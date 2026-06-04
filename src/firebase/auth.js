@@ -19,16 +19,38 @@ export async function ensureUserDoc(user) {
 
   if (!snap.exists()) {
     await setDoc(ref, {
-      uid:         user.uid,
-      displayName: user.displayName ?? '',
-      email:       user.email ?? '',
-      photoURL:    user.photoURL ?? '',
-      role:        'student',     // default; teacher accounts are set manually
-      createdAt:   serverTimestamp(),
-      updatedAt:   serverTimestamp(),
+      uid:              user.uid,
+      displayName:      user.displayName ?? '',
+      email:            user.email ?? '',
+      photoURL:         user.photoURL ?? '',
+      role:             null,   // set during onboarding
+      profileCompleted: false,
+      createdAt:        serverTimestamp(),
+      updatedAt:        serverTimestamp(),
     })
   }
   return snap.exists() ? snap.data() : null
+}
+
+export async function saveStudentProfile(uid, { displayName, grade, subjects }) {
+  await setDoc(doc(db, 'users', uid), {
+    displayName,
+    grade,
+    subjects,  // [{ name, teacher }]
+    role: 'student',
+    profileCompleted: true,
+    updatedAt: serverTimestamp(),
+  }, { merge: true })
+}
+
+export async function saveTeacherProfile(uid, { displayName, teachingGroups }) {
+  await setDoc(doc(db, 'users', uid), {
+    displayName,
+    teachingGroups, // [{ subject, grade }]
+    role: 'teacher',
+    profileCompleted: true,
+    updatedAt: serverTimestamp(),
+  }, { merge: true })
 }
 
 export async function getUserDoc(uid) {

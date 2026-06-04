@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PageLoader } from './components/ui/LoadingSpinner'
 import Landing          from './pages/Landing'
 import Login            from './pages/Login'
+import Onboarding       from './pages/Onboarding'
 import StudentDashboard from './pages/StudentDashboard'
 import TeacherDashboard from './pages/TeacherDashboard'
 import ReflectionEntry  from './pages/ReflectionEntry'
@@ -12,9 +13,10 @@ import ApprovalReview   from './pages/ApprovalReview'
 import StudentsPage     from './pages/StudentsPage'
 
 function RequireAuth({ children }) {
-  const { user, loading } = useAuth()
+  const { user, loading, needsOnboarding } = useAuth()
   if (loading) return <PageLoader />
   if (!user) return <Navigate to="/login" replace />
+  if (needsOnboarding) return <Navigate to="/onboarding" replace />
   return children
 }
 
@@ -34,8 +36,9 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public */}
-      <Route path="/"      element={<Landing />} />
-      <Route path="/login" element={<Login />} />
+      <Route path="/"           element={<Landing />} />
+      <Route path="/login"      element={<Login />} />
+      <Route path="/onboarding" element={<Onboarding />} />
 
       {/* Student */}
       <Route path="/dashboard" element={
