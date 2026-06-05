@@ -9,7 +9,7 @@ import Button from '../components/ui/Button'
 import { Select, Textarea } from '../components/ui/Input'
 import { LevelBadge, CategoryBadge } from '../components/ui/Badge'
 import {
-  SUBJECTS, ATL_CATEGORIES, ATL_CATEGORY_KEYS,
+  ATL_CATEGORIES, ATL_CATEGORY_KEYS,
   ASSESSMENT_LEVELS, TERMS,
 } from '../utils/atlFramework'
 import toast from 'react-hot-toast'
@@ -117,7 +117,9 @@ export default function ReflectionEntry() {
             <div className="grid sm:grid-cols-2 gap-4">
               <Select label="Subject" value={form.subject} onChange={set('subject')} error={errors.subject}>
                 <option value="">Select subject…</option>
-                {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                {(userDoc?.subjects ?? []).map(s => (
+                  <option key={s.name} value={s.name}>{s.name}</option>
+                ))}
               </Select>
               <Select label="Term Period" value={form.term} onChange={set('term')} error={errors.term}>
                 <option value="">Select term…</option>

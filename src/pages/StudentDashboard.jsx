@@ -66,23 +66,26 @@ export default function StudentDashboard() {
             />
           </motion.div>
 
-          {/* Subject breakdown */}
+          {/* Subject breakdown — only the student's enrolled subjects */}
           <motion.div variants={item} className="space-y-3">
-            <h3 className="section-title px-0.5">Subject Breakdown</h3>
-            {SUBJECTS.map(subject => {
-              const subjectEntries = analytics.approvedEntries.filter(e => e.subject === subject)
+            <h3 className="section-title px-0.5">My Subjects</h3>
+            {(userDoc?.subjects ?? []).length === 0 ? (
+              <p className="text-xs text-slate-400 px-0.5">No subjects enrolled yet.</p>
+            ) : (userDoc.subjects).map(sub => {
+              const subjectEntries = analytics.approvedEntries.filter(e => e.subject === sub.name)
               const avg = subjectEntries.length
                 ? (subjectEntries.reduce((s, e) => s + (e.teacherScore ?? e.score), 0) / subjectEntries.length).toFixed(1)
                 : null
               return (
-                <div key={subject} className="card p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-slate-800">{subject}</span>
+                <div key={sub.name} className="card p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-slate-800">{sub.name}</span>
                     {avg
                       ? <span className="text-sm font-semibold text-navy-700">{avg}<span className="text-slate-400 font-normal text-xs">/4</span></span>
                       : <span className="text-xs text-slate-400">No data</span>
                     }
                   </div>
+                  <p className="text-[11px] text-slate-400 mb-2">{sub.teacher}</p>
                   <div className="w-full bg-slate-100 rounded-full h-1.5">
                     <div
                       className="h-1.5 rounded-full bg-navy-600 transition-all duration-500"
