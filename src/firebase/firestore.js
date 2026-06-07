@@ -141,3 +141,76 @@ export function subscribeToStudentTeacherRatings(studentId, callback) {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
   })
 }
+
+// ─── Units ────────────────────────────────────────────────────────────────────
+
+export async function createUnit(data) {
+  const ref = await addDoc(collection(db, 'units'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function deleteUnit(id) {
+  await deleteDoc(doc(db, 'units', id))
+}
+
+export function subscribeToTeacherUnits(teacherUid, callback) {
+  const q = query(
+    collection(db, 'units'),
+    where('teacherUid', '==', teacherUid),
+  )
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  })
+}
+
+export async function getUnitsForSubjectAndTeacher(subject, teacherName) {
+  const q = query(
+    collection(db, 'units'),
+    where('subject', '==', subject),
+    where('teacherName', '==', teacherName),
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+// ─── Unit Ratings ─────────────────────────────────────────────────────────────
+
+export async function saveUnitRating(data) {
+  const q = query(
+    collection(db, 'unit_ratings'),
+    where('studentId', '==', data.studentId),
+    where('unitId', '==', data.unitId),
+    where('atl', '==', data.atl),
+  )
+  const existing = await getDocs(q)
+  if (!existing.empty) {
+    const docId = existing.docs[0].id
+    await updateDoc(doc(db, 'unit_ratings', docId), { ...data, updatedAt: serverTimestamp() })
+    return docId
+  }
+  const ref = await addDoc(collection(db, 'unit_ratings'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export function subscribeToStudentUnitRatings(studentId, callback) {
+  const q = query(collection(db, 'unit_ratings'), where('studentId', '==', studentId))
+  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+}
+
+export function subscribeToTeacherStudentUnitRatings(teacherUid, studentId, term, callback) {
+  const q = query(
+    collection(db, 'unit_ratings'),
+    where('teacherUid', '==', teacherUid),
+    where('studentId', '==', studentId),
+    where('term', '==', term),
+  )
+  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+}

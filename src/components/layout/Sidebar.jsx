@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, PenLine, BarChart3, CheckCircle,
-  BookOpen, LogOut, Users, ChevronRight,
+  BookOpen, LogOut, Users, ChevronRight, BookMarked, FileText,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { signOut } from '../../firebase/auth'
@@ -16,10 +16,12 @@ const studentNav = [
 ]
 
 const teacherNav = [
-  { to: '/teacher',    label: 'Overview',    icon: LayoutDashboard },
-  { to: '/approvals',  label: 'Approvals',   icon: CheckCircle },
-  { to: '/analytics',  label: 'Analytics',   icon: BarChart3 },
-  { to: '/students',   label: 'Students',    icon: Users },
+  { to: '/teacher',    label: 'Overview',      icon: LayoutDashboard },
+  { to: '/approvals',  label: 'Approvals',     icon: CheckCircle },
+  { to: '/units',      label: 'Unit Planning', icon: BookMarked },
+  { to: '/reports',    label: 'Reports',       icon: FileText },
+  { to: '/students',   label: 'Students',      icon: Users },
+  { to: '/analytics',  label: 'Analytics',     icon: BarChart3 },
 ]
 
 export default function Sidebar({ mobile, onClose }) {

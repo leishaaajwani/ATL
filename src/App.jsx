@@ -11,6 +11,8 @@ import ReflectionEntry  from './pages/ReflectionEntry'
 import Analytics        from './pages/Analytics'
 import ApprovalReview   from './pages/ApprovalReview'
 import StudentsPage     from './pages/StudentsPage'
+import UnitPlanning     from './pages/UnitPlanning'
+import ReportsPage      from './pages/ReportsPage'
 
 function RequireAuth({ children }) {
   const { user, loading, needsOnboarding } = useAuth()
@@ -35,12 +37,10 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public */}
       <Route path="/"           element={<Landing />} />
       <Route path="/login"      element={<Login />} />
       <Route path="/onboarding" element={<Onboarding />} />
 
-      {/* Student */}
       <Route path="/dashboard" element={
         <RequireAuth><RequireRole role="student"><StudentDashboard /></RequireRole></RequireAuth>
       } />
@@ -48,7 +48,6 @@ function AppRoutes() {
         <RequireAuth><RequireRole role="student"><ReflectionEntry /></RequireRole></RequireAuth>
       } />
 
-      {/* Teacher */}
       <Route path="/teacher" element={
         <RequireAuth><RequireRole role="teacher"><TeacherDashboard /></RequireRole></RequireAuth>
       } />
@@ -58,11 +57,15 @@ function AppRoutes() {
       <Route path="/students" element={
         <RequireAuth><RequireRole role="teacher"><StudentsPage /></RequireRole></RequireAuth>
       } />
+      <Route path="/units" element={
+        <RequireAuth><RequireRole role="teacher"><UnitPlanning /></RequireRole></RequireAuth>
+      } />
+      <Route path="/reports" element={
+        <RequireAuth><RequireRole role="teacher"><ReportsPage /></RequireRole></RequireAuth>
+      } />
 
-      {/* Shared */}
       <Route path="/analytics" element={<RequireAuth><Analytics /></RequireAuth>} />
 
-      {/* Fallback */}
       <Route path="*" element={
         user && userDoc
           ? <Navigate to={userDoc.role === 'teacher' ? '/teacher' : '/dashboard'} replace />
