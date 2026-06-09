@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '../firebase/config'
-import { getUserDoc } from '../firebase/auth'
+import { getUserDoc, ensureUserDoc } from '../firebase/auth'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
+  const [user, setUser]       = useState(null)
   const [userDoc, setUserDoc] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -14,8 +14,14 @@ export function AuthProvider({ children }) {
     const unsub = onAuthStateChanged(auth, async firebaseUser => {
       if (firebaseUser) {
         setUser(firebaseUser)
-        const doc = await getUserDoc(firebaseUser.uid)
-        setUserDoc(doc)
+        // getUserDoc can return null if onAuthStateChanged fires before ensureUserDoc
+        // finishes writing the doc (race condition on first sign-in).
+        let docData = await getUserDoc(firebaseUser.uid)
+        if (!docData) {
+          await ensureUserDoc(firebaseUser)
+          docData = await getUserDoc(firebaseUser.uid)
+        }
+        setUserDoc(docData)
       } else {
         setUser(null)
         setUserDoc(null)

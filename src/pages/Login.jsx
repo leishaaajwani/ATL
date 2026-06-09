@@ -14,7 +14,11 @@ export default function Login() {
 
   useEffect(() => {
     if (!authLoading && user && userDoc) {
-      navigate(userDoc.role === 'teacher' ? '/teacher' : '/dashboard', { replace: true })
+      if (!userDoc.profileCompleted) {
+        navigate('/onboarding', { replace: true })
+      } else {
+        navigate(userDoc.role === 'teacher' ? '/teacher' : '/dashboard', { replace: true })
+      }
     }
   }, [authLoading, user, userDoc])
 

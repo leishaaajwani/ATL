@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle, XCircle, MessageSquare, ChevronDown, Filter } from 'lucide-react'
 import { usePendingEntries, useAllEntries } from '../hooks/useATLEntries'
-import { approveEntry, rejectEntry } from '../firebase/firestore'
+import { approveEntry, rejectEntry, subscribeToStudents } from '../firebase/firestore'
+import { useAuth } from '../contexts/AuthContext'
+import { getMyStudents } from '../utils/helpers'
 import PageLayout from '../components/layout/PageLayout'
 import Card, { CardHeader } from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -14,11 +16,26 @@ import { formatDateTime, truncate } from '../utils/helpers'
 import toast from 'react-hot-toast'
 
 export default function ApprovalReview() {
-  const { entries: pending, loading } = usePendingEntries()
+  const { userDoc } = useAuth()
+  const { entries: allPending, loading } = usePendingEntries()
   const { entries: allEntries } = useAllEntries()
   const [filter, setFilter] = useState('pending')
+  const [allStudents, setAllStudents] = useState([])
 
-  const reviewed = allEntries.filter(e => e.approvalStatus !== 'pending')
+  useEffect(() => {
+    const unsub = subscribeToStudents(setAllStudents)
+    return unsub
+  }, [])
+
+  const myStudentIds = new Set(
+    getMyStudents(userDoc?.displayName, userDoc?.teachingGroups, allStudents).map(s => s.id),
+  )
+
+  // If no students yet (still loading), show all; once loaded, filter
+  const filterFn = e => myStudentIds.size === 0 || myStudentIds.has(e.studentId)
+
+  const pending  = allPending.filter(filterFn)
+  const reviewed = allEntries.filter(e => e.approvalStatus !== 'pending' && filterFn(e))
   const displayed = filter === 'pending' ? pending : reviewed
 
   return (

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PenLine, Clock, CheckCircle, XCircle, TrendingUp, BookOpen } from 'lucide-react'
+import { PenLine, Clock, CheckCircle, XCircle, TrendingUp, BookOpen, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useStudentEntries } from '../hooks/useATLEntries'
 import { useAnalytics } from '../hooks/useAnalytics'
@@ -9,7 +9,7 @@ import Card, { CardHeader } from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { LevelBadge, CategoryBadge, StatusBadge } from '../components/ui/Badge'
 import ChartContainer from '../components/charts/ChartContainer'
-import { SUBJECTS, ATL_CATEGORIES, ATL_CATEGORY_KEYS } from '../utils/atlFramework'
+import { ATL_CATEGORIES, ATL_CATEGORY_KEYS } from '../utils/atlFramework'
 import { formatDate, truncate } from '../utils/helpers'
 
 const container = {
@@ -23,7 +23,8 @@ export default function StudentDashboard() {
   const { entries, loading } = useStudentEntries(userDoc?.uid)
   const analytics = useAnalytics(entries)
 
-  const recentEntries = entries.slice(0, 5)
+  const recentEntries   = entries.slice(0, 5)
+  const rejectedEntries = entries.filter(e => e.approvalStatus === 'rejected')
 
   return (
     <PageLayout>
@@ -40,6 +41,38 @@ export default function StudentDashboard() {
             <Button icon={<PenLine size={15} />}>New Entry</Button>
           </Link>
         </motion.div>
+
+        {/* Returned entries alert */}
+        {rejectedEntries.length > 0 && (
+          <motion.div variants={item} className="card p-4 border-rose-100 bg-rose-50">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle size={15} className="text-rose-500" />
+              <p className="text-sm font-semibold text-rose-700">
+                {rejectedEntries.length} {rejectedEntries.length === 1 ? 'entry' : 'entries'} returned for revision
+              </p>
+            </div>
+            <div className="space-y-2">
+              {rejectedEntries.map(e => (
+                <div key={e.id} className="bg-white rounded-xl p-3 border border-rose-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-medium text-slate-800">{e.subject}</span>
+                    <span className="text-slate-300">·</span>
+                    <span className="text-xs text-slate-500">{e.atlCategory}</span>
+                    {e.unitName && <span className="text-[10px] text-slate-400">— {e.unitName}</span>}
+                  </div>
+                  {e.teacherFeedback && (
+                    <p className="text-xs text-rose-600 italic">
+                      Teacher: "{e.teacherFeedback}"
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-rose-500 mt-2">
+              Submit a new entry addressing the feedback above.
+            </p>
+          </motion.div>
+        )}
 
         {/* Stats row */}
         <motion.div variants={item} className="grid grid-cols-2 sm:grid-cols-4 gap-4">

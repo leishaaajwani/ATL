@@ -13,11 +13,13 @@ import {
   saveUnitRating,
   subscribeToTeacherStudentUnitRatings,
 } from '../firebase/firestore'
+import { getMyStudents } from '../utils/helpers'
 import PageLayout from '../components/layout/PageLayout'
-import { ATL_CATEGORIES, ASSESSMENT_LEVELS, SCORE_MAP } from '../utils/atlFramework'
+import { ATL_CATEGORIES, ATL_CATEGORY_KEYS, ASSESSMENT_LEVELS, SCORE_MAP, SCORE_LABEL } from '../utils/atlFramework'
 import toast from 'react-hot-toast'
 
 const REPORT_TERMS = ['Term 1', 'Term 2', 'Term 3']
+const GRADE_TABS   = ['All', 'DP1', 'DP2']
 
 const ATL_COLORS = {
   Communication:    '#6366f1',
@@ -28,19 +30,26 @@ const ATL_COLORS = {
 }
 
 export default function ReportsPage() {
-  const { user } = useAuth()
+  const { user, userDoc } = useAuth()
   const [selectedTerm, setSelectedTerm] = useState('Term 1')
-  const [students, setStudents] = useState([])
+  const [gradeFilter, setGradeFilter] = useState('All')
+  const [allStudents, setAllStudents] = useState([])
   const [units, setUnits] = useState([])
   const [allEntries, setAllEntries] = useState([])
   const [openStudent, setOpenStudent] = useState(null)
 
   useEffect(() => {
-    const u1 = subscribeToStudents(setStudents)
+    const u1 = subscribeToStudents(setAllStudents)
     const u2 = subscribeToTeacherUnits(user.uid, setUnits)
     const u3 = subscribeToAllEntries(setAllEntries)
     return () => { u1(); u2(); u3() }
   }, [user])
+
+  // Filter to this teacher's students only, then by grade
+  const myStudents = getMyStudents(userDoc?.displayName, userDoc?.teachingGroups, allStudents)
+  const students = gradeFilter === 'All'
+    ? myStudents
+    : myStudents.filter(s => s.grade === gradeFilter)
 
   const termUnits = units.filter(u => u.term === selectedTerm)
 
@@ -62,21 +71,38 @@ export default function ReportsPage() {
           </Link>
         </div>
 
-        {/* Term tabs */}
-        <div className="flex gap-2">
-          {REPORT_TERMS.map(t => (
-            <button
-              key={t}
-              onClick={() => { setSelectedTerm(t); setOpenStudent(null) }}
-              className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
-                selectedTerm === t
-                  ? 'bg-navy-700 text-white shadow-sm'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+        {/* Term tabs + grade filter */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-2">
+            {REPORT_TERMS.map(t => (
+              <button
+                key={t}
+                onClick={() => { setSelectedTerm(t); setOpenStudent(null) }}
+                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
+                  selectedTerm === t
+                    ? 'bg-navy-700 text-white shadow-sm'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1.5 ml-auto">
+            {GRADE_TABS.map(g => (
+              <button
+                key={g}
+                onClick={() => { setGradeFilter(g); setOpenStudent(null) }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                  gradeFilter === g
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-300'
+                }`}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Info pill if no units planned */}
@@ -91,10 +117,10 @@ export default function ReportsPage() {
         )}
 
         {/* Student list */}
-        {students.length === 0 ? (
+        {myStudents.length === 0 ? (
           <div className="card p-14 text-center">
             <Users size={32} className="text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-500">No students enrolled yet</p>
+            <p className="text-sm text-slate-500">No students in your classes yet</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -360,6 +386,49 @@ function StudentReport({ teacherUid, student, term, termUnits, studentEntries })
           })}
         </div>
       </div>
+
+      {/* ── Term Summary — aggregate across all units ── */}
+      {Object.keys(ratings).length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+            {term} Summary
+            <span className="font-normal normal-case text-slate-400 ml-2">— your final ratings across all units</span>
+          </p>
+          <div className="rounded-xl border border-slate-100 overflow-hidden">
+            {ATL_CATEGORY_KEYS.map(skill => {
+              // Collect all ratings for this skill across all units in this term
+              const skillRatings = Object.entries(ratings)
+                .filter(([key]) => key.endsWith(`_${skill}`))
+                .map(([, level]) => SCORE_MAP[level] ?? 0)
+                .filter(Boolean)
+              if (skillRatings.length === 0) return null
+              const avg = skillRatings.reduce((a, b) => a + b, 0) / skillRatings.length
+              const avgLabel = SCORE_LABEL[Math.round(avg)]
+              const { color, bg } = ATL_CATEGORIES[skill] ?? {}
+              return (
+                <div key={skill} className="flex items-center gap-4 px-4 py-3 border-b border-slate-50 last:border-0">
+                  <span className="text-xs font-semibold w-28 flex-shrink-0" style={{ color }}>{skill}</span>
+                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${(avg / 4) * 100}%`, backgroundColor: color }}
+                    />
+                  </div>
+                  <span
+                    className="text-xs font-semibold px-2.5 py-1 rounded-lg w-24 text-center"
+                    style={{ backgroundColor: bg, color }}
+                  >
+                    {avgLabel}
+                  </span>
+                  <span className="text-[10px] text-slate-400 w-12 text-right">
+                    {avg.toFixed(1)}/4
+                  </span>
+                </div>
+              )
+            }).filter(Boolean)}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

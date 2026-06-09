@@ -4,32 +4,43 @@ import { Clock, CheckCircle, Users, TrendingUp, ArrowRight, BarChart3 } from 'lu
 import { useAllEntries, usePendingEntries } from '../hooks/useATLEntries'
 import { useAnalytics } from '../hooks/useAnalytics'
 import { subscribeToStudents } from '../firebase/firestore'
+import { useAuth } from '../contexts/AuthContext'
 import PageLayout from '../components/layout/PageLayout'
 import Card, { CardHeader } from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { LevelBadge, CategoryBadge, StatusBadge } from '../components/ui/Badge'
 import ChartContainer from '../components/charts/ChartContainer'
 import { ATL_CATEGORIES, ATL_CATEGORY_KEYS } from '../utils/atlFramework'
-import { formatDate, truncate } from '../utils/helpers'
+import { formatDate, truncate, getMyStudents } from '../utils/helpers'
 import { useEffect, useState } from 'react'
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
 
 export default function TeacherDashboard() {
+  const { userDoc } = useAuth()
   const { entries: allEntries, loading } = useAllEntries()
-  const { entries: pendingEntries } = usePendingEntries()
-  const analytics = useAnalytics(allEntries)
-  const [students, setStudents] = useState([])
+  const { entries: allPending } = usePendingEntries()
+  const [allStudents, setAllStudents] = useState([])
 
   useEffect(() => {
-    const unsub = subscribeToStudents(setStudents)
+    const unsub = subscribeToStudents(setAllStudents)
     return unsub
   }, [])
 
+  // Filter to only this teacher's students
+  const students = getMyStudents(userDoc?.displayName, userDoc?.teachingGroups, allStudents)
+  const myStudentIds = new Set(students.map(s => s.id))
+
+  // Filter entries to this teacher's students only
+  const myEntries = allEntries.filter(e => myStudentIds.has(e.studentId))
+  const pendingEntries = allPending.filter(e => myStudentIds.has(e.studentId))
+
+  const analytics = useAnalytics(myEntries)
+
   // Per-student summary
   const studentSummaries = students.map(s => {
-    const sEntries = allEntries.filter(e => e.studentId === s.id)
+    const sEntries = myEntries.filter(e => e.studentId === s.id)
     const approved = sEntries.filter(e => e.approvalStatus === 'approved')
     const scores   = approved.map(e => e.teacherScore ?? e.score)
     const avg      = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null

@@ -50,3 +50,23 @@ export function capitalise(str) {
   if (!str) return ''
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
+
+const clean = v => String(v || '').trim().toLowerCase()
+
+/**
+ * From the teacher's teachingGroups and display name,
+ * filter a list of all students to only those who selected this teacher
+ * for a subject that matches one of the teacher's groups (subject + grade).
+ */
+export function getMyStudents(teacherName, teachingGroups, allStudents) {
+  if (!teacherName || !teachingGroups?.length || !allStudents?.length) return []
+  return allStudents.filter(student =>
+    teachingGroups.some(group =>
+      clean(student.grade) === clean(group.grade) &&
+      (student.subjects ?? []).some(s =>
+        clean(s.name) === clean(group.subject) &&
+        clean(s.teacher) === clean(teacherName),
+      ),
+    ),
+  )
+}
