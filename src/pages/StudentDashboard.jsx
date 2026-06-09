@@ -1,15 +1,17 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { PenLine, Clock, CheckCircle, XCircle, TrendingUp, BookOpen, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useStudentEntries } from '../hooks/useATLEntries'
 import { useAnalytics } from '../hooks/useAnalytics'
+import { subscribeToStudentUnitRatings } from '../firebase/firestore'
 import PageLayout from '../components/layout/PageLayout'
 import Card, { CardHeader } from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { LevelBadge, CategoryBadge, StatusBadge } from '../components/ui/Badge'
 import ChartContainer from '../components/charts/ChartContainer'
-import { ATL_CATEGORIES, ATL_CATEGORY_KEYS } from '../utils/atlFramework'
+import { ATL_CATEGORIES, ATL_CATEGORY_KEYS, SCORE_MAP, SCORE_LABEL } from '../utils/atlFramework'
 import { formatDate, truncate } from '../utils/helpers'
 
 const container = {
@@ -19,9 +21,16 @@ const container = {
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
 
 export default function StudentDashboard() {
-  const { userDoc } = useAuth()
+  const { user, userDoc } = useAuth()
   const { entries, loading } = useStudentEntries(userDoc?.uid)
   const analytics = useAnalytics(entries)
+  const [unitRatings, setUnitRatings] = useState([])
+
+  useEffect(() => {
+    if (!user?.uid) return
+    const unsub = subscribeToStudentUnitRatings(user.uid, setUnitRatings)
+    return unsub
+  }, [user])
 
   const recentEntries   = entries.slice(0, 5)
   const rejectedEntries = entries.filter(e => e.approvalStatus === 'rejected')
@@ -109,6 +118,19 @@ export default function StudentDashboard() {
               const avg = subjectEntries.length
                 ? (subjectEntries.reduce((s, e) => s + (e.teacherScore ?? e.score), 0) / subjectEntries.length).toFixed(1)
                 : null
+
+              // Teacher's unit ratings for this subject
+              const subTeacherRatings = unitRatings.filter(r => r.subject === sub.name)
+              const teacherAtlMap = ATL_CATEGORY_KEYS.reduce((acc, cat) => {
+                const catR = subTeacherRatings.filter(r => r.atl === cat)
+                if (catR.length > 0) {
+                  const avgScore = catR.reduce((s, r) => s + (SCORE_MAP[r.level] ?? 0), 0) / catR.length
+                  acc[cat] = SCORE_LABEL[Math.round(avgScore)]
+                }
+                return acc
+              }, {})
+              const hasTeacherRating = Object.keys(teacherAtlMap).length > 0
+
               return (
                 <div key={sub.name} className="card p-4">
                   <div className="flex items-center justify-between mb-1">
@@ -128,6 +150,29 @@ export default function StudentDashboard() {
                   <p className="text-xs text-slate-400 mt-1.5">
                     {subjectEntries.length} approved {subjectEntries.length === 1 ? 'entry' : 'entries'}
                   </p>
+
+                  {/* Teacher's unit-based evaluation */}
+                  {hasTeacherRating && (
+                    <div className="mt-3 pt-3 border-t border-slate-50">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
+                        Teacher's Evaluation
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.entries(teacherAtlMap).map(([cat, label]) => {
+                          const { color, bg } = ATL_CATEGORIES[cat]
+                          return (
+                            <span
+                              key={cat}
+                              className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                              style={{ backgroundColor: bg, color }}
+                            >
+                              {cat.split('-')[0]}: {label}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
