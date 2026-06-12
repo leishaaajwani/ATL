@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { PenLine, Clock, CheckCircle, XCircle, TrendingUp, BookOpen, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -22,6 +22,7 @@ const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
 
 export default function StudentDashboard() {
   const { user, userDoc } = useAuth()
+  const navigate = useNavigate()
   const { entries, loading } = useStudentEntries(userDoc?.uid)
   const analytics = useAnalytics(entries)
   const [unitRatings, setUnitRatings] = useState([])
@@ -33,7 +34,11 @@ export default function StudentDashboard() {
   }, [user])
 
   const recentEntries   = entries.slice(0, 5)
-  const rejectedEntries = entries.filter(e => e.approvalStatus === 'rejected')
+  // De-dupe rejected entries by unitSubmissionId so one unit form shows once
+  const rejectedRaw = entries.filter(e => e.approvalStatus === 'rejected')
+  const rejectedEntries = rejectedRaw.filter((e, _, arr) =>
+    !e.unitSubmissionId || arr.findIndex(x => x.unitSubmissionId === e.unitSubmissionId) === arr.indexOf(e),
+  )
 
   return (
     <PageLayout>
@@ -63,22 +68,33 @@ export default function StudentDashboard() {
             <div className="space-y-2">
               {rejectedEntries.map(e => (
                 <div key={e.id} className="bg-white rounded-xl p-3 border border-rose-100">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-medium text-slate-800">{e.subject}</span>
-                    <span className="text-slate-300">·</span>
-                    <span className="text-xs text-slate-500">{e.atlCategory}</span>
-                    {e.unitName && <span className="text-[10px] text-slate-400">— {e.unitName}</span>}
+                  <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-slate-800">{e.subject}</span>
+                      {e.unitName && (
+                        <>
+                          <span className="text-slate-300">·</span>
+                          <span className="text-xs text-slate-500">{e.unitName}</span>
+                        </>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => navigate(`/reflect?subject=${encodeURIComponent(e.subject)}&unitId=${encodeURIComponent(e.unitId ?? '')}`)}
+                      className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors"
+                    >
+                      Revise &amp; Resubmit
+                    </button>
                   </div>
                   {e.teacherFeedback && (
-                    <p className="text-xs text-rose-600 italic">
-                      Teacher: "{e.teacherFeedback}"
+                    <p className="text-xs text-rose-600 italic mt-1">
+                      Feedback: "{e.teacherFeedback}"
                     </p>
                   )}
                 </div>
               ))}
             </div>
             <p className="text-xs text-rose-500 mt-2">
-              Submit a new entry addressing the feedback above.
+              Address the feedback and resubmit — your teacher will review the new entry.
             </p>
           </motion.div>
         )}

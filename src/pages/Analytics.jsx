@@ -22,9 +22,10 @@ const REPORT_TERMS = ['Term 1', 'Term 2', 'Term 3']
 
 export default function Analytics() {
   const { user, userDoc, isTeacher } = useAuth()
-  const [selectedStudent, setSelectedStudent] = useState('all')
-  const [filterSubject, setFilterSubject]     = useState('all')
-  const [filterTerm, setFilterTerm]           = useState('all')
+  const [selectedStudent, setSelectedStudent]       = useState('all')
+  const [filterSubject, setFilterSubject]           = useState('all')
+  const [filterTerm, setFilterTerm]                 = useState('all')
+  const [filterTeacherSubject, setFilterTeacherSubject] = useState('all')
 
   const { entries: allEntries } = useAllEntries()
   const { entries: myEntries }  = useStudentEntries(userDoc?.uid)
@@ -36,9 +37,20 @@ export default function Analytics() {
     const unsub = subscribeToStudents(setAllStudents)
     return unsub
   }, [isTeacher])
-  const myStudents = isTeacher
+  const allMyStudents = isTeacher
     ? getMyStudents(userDoc?.displayName, userDoc?.teachingGroups, allStudents)
     : []
+
+  // Teacher subject filter: narrows student list to those in a specific subject
+  const teacherSubjects = [...new Set((userDoc?.teachingGroups ?? []).map(g => g.subject))].sort()
+  const myStudents = isTeacher && filterTeacherSubject !== 'all'
+    ? allMyStudents.filter(s =>
+        (s.subjects ?? []).some(sub =>
+          sub.name === filterTeacherSubject &&
+          String(sub.teacher ?? '').trim().toLowerCase() === String(userDoc?.displayName ?? '').trim().toLowerCase(),
+        ),
+      )
+    : allMyStudents
 
   const sourceEntries = isTeacher
     ? (selectedStudent === 'all'
@@ -82,14 +94,18 @@ export default function Analytics() {
     ? unitRatings
     : unitRatings.filter(r => r.term === selectedRatingTerm)
 
+  // Label for the student's bar — student's own name when teacher is viewing a specific student
+  const selectedStudentDoc = myStudents.find(s => s.id === selectedStudent)
+  const studentBarLabel = isTeacher && selectedStudentDoc
+    ? `${selectedStudentDoc.displayName?.split(' ')[0]}'s Rating`
+    : 'Your Rating'
+
   const comparisonData = ATL_CATEGORY_KEYS.map(cat => {
-    // Student's avg self-assessment for this ATL (from approved entries)
     const studentEntries = analytics.approvedEntries.filter(e => e.atlCategory === cat)
     const studentAvg = studentEntries.length
       ? studentEntries.reduce((s, e) => s + (SCORE_MAP[e.selfAssessment] ?? 0), 0) / studentEntries.length
       : null
 
-    // Teacher's avg unit rating for this ATL
     const catRatings = filteredRatings.filter(r => r.atl === cat)
     const teacherAvg = catRatings.length
       ? catRatings.reduce((s, r) => s + (SCORE_MAP[r.level] ?? 0), 0) / catRatings.length
@@ -97,8 +113,8 @@ export default function Analytics() {
 
     return {
       name: cat === 'Self-management' ? 'Self-Mgmt' : cat,
-      'Your Rating':    studentAvg !== null ? parseFloat(studentAvg.toFixed(2)) : null,
-      'Teacher Rating': teacherAvg !== null ? parseFloat(teacherAvg.toFixed(2)) : null,
+      [studentBarLabel]: studentAvg !== null ? parseFloat(studentAvg.toFixed(2)) : null,
+      'Teacher Rating':  teacherAvg !== null ? parseFloat(teacherAvg.toFixed(2)) : null,
     }
   })
 
@@ -127,16 +143,26 @@ export default function Analytics() {
             <span className="text-xs font-medium text-slate-500">Filter:</span>
 
             {isTeacher && (
-              <select
-                value={selectedStudent}
-                onChange={e => setSelectedStudent(e.target.value)}
-                className="input-base py-1.5 text-xs w-auto min-w-[140px]"
-              >
-                <option value="all">All my students</option>
-                {myStudents.map(s => (
-                  <option key={s.id} value={s.id}>{s.displayName}</option>
-                ))}
-              </select>
+              <>
+                <select
+                  value={filterTeacherSubject}
+                  onChange={e => { setFilterTeacherSubject(e.target.value); setSelectedStudent('all') }}
+                  className="input-base py-1.5 text-xs w-auto min-w-[160px]"
+                >
+                  <option value="all">All subjects</option>
+                  {teacherSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select
+                  value={selectedStudent}
+                  onChange={e => setSelectedStudent(e.target.value)}
+                  className="input-base py-1.5 text-xs w-auto min-w-[140px]"
+                >
+                  <option value="all">All students</option>
+                  {myStudents.map(s => (
+                    <option key={s.id} value={s.id}>{s.displayName}</option>
+                  ))}
+                </select>
+              </>
             )}
 
             <select
@@ -181,10 +207,18 @@ export default function Analytics() {
         {/* Self vs Teacher comparison (unit ratings) */}
         <Card>
           <CardHeader
-            title="Self vs Teacher Assessment"
-            subtitle={hasUnitRatings ? `${unitRatings.length} teacher rating(s) across units` : 'No teacher ratings yet'}
+            title={isTeacher && selectedStudentDoc ? `${selectedStudentDoc.displayName?.split(' ')[0]}'s Self vs Your Rating` : 'Self vs Teacher Assessment'}
+            subtitle={
+              isTeacher && selectedStudent === 'all'
+                ? 'Select a student above to compare their self-assessment with your unit ratings'
+                : hasUnitRatings ? `${unitRatings.length} teacher rating(s) across units` : 'No teacher ratings yet'
+            }
           />
-          {hasUnitRatings ? (
+          {isTeacher && selectedStudent === 'all' ? (
+            <div className="py-8 text-center text-sm text-slate-400">
+              Select a student from the filter above to see their self-assessment compared with your unit ratings.
+            </div>
+          ) : hasUnitRatings ? (
             <div className="space-y-4">
               {/* Term filter */}
               <div className="flex gap-2 flex-wrap">
@@ -229,16 +263,16 @@ export default function Analytics() {
                     contentStyle={{ borderRadius: 12, border: '1px solid #f1f5f9', fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="Your Rating"    fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                  <Bar dataKey="Teacher Rating" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  <Bar dataKey={studentBarLabel} fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  <Bar dataKey="Teacher Rating"  fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
                 </BarChart>
               </ResponsiveContainer>
 
               {/* Diff row */}
               <div className="grid grid-cols-5 gap-2 pt-2 border-t border-slate-100">
                 {comparisonData.map(d => {
-                  const diff = d['Teacher Rating'] !== null && d['Your Rating'] !== null
-                    ? (d['Teacher Rating'] - d['Your Rating']).toFixed(1)
+                  const diff = d['Teacher Rating'] !== null && d[studentBarLabel] !== null
+                    ? (d['Teacher Rating'] - d[studentBarLabel]).toFixed(1)
                     : null
                   return (
                     <div key={d.name} className="text-center">
@@ -258,7 +292,7 @@ export default function Analytics() {
           ) : (
             <div className="py-8 text-center text-sm text-slate-400">
               {isTeacher
-                ? 'Select a student and go to Reports to add unit ratings.'
+                ? 'Go to Reports to add unit ratings for this student.'
                 : 'Your teacher has not submitted unit ratings yet.'}
             </div>
           )}
@@ -313,8 +347,8 @@ export default function Analytics() {
           </div>
         </Card>
 
-        {/* Reflection Journal */}
-        <Card>
+        {/* Reflection Journal — students only */}
+        {!isTeacher && <Card>
           <CardHeader title="Reflection Journal" subtitle={`${journalEntries.length} entries`} />
           {journalEntries.length === 0 ? (
             <div className="py-8 text-center text-sm text-slate-400">No entries match your filters.</div>
@@ -352,7 +386,7 @@ export default function Analytics() {
               ))}
             </div>
           )}
-        </Card>
+        </Card>}
       </div>
     </PageLayout>
   )

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -20,9 +20,10 @@ function countWords(text) {
 export default function ReflectionEntry() {
   const { user, userDoc } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
-  const [subject, setSubject]       = useState('')
-  const [unitId, setUnitId]         = useState('')
+  const [subject, setSubject]       = useState(searchParams.get('subject') ?? '')
+  const [unitId, setUnitId]         = useState(searchParams.get('unitId') ?? '')
   const [atlRatings, setAtlRatings] = useState({})   // { Thinking: 'Proficient', ... }
   const [reflection, setReflection] = useState('')
   const [errors, setErrors]         = useState({})
