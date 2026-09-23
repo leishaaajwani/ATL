@@ -86,3 +86,19 @@ Nothing here is specific to a host. When IT confirms where MySQL lives, point
 - Does it enforce TLS? If so, append `?ssl={"rejectUnauthorized":true}` to the
   connection URL.
 - MySQL 8.0 or newer. The schema uses features 5.7 does not have.
+
+## Running it locally
+
+```bash
+npm run dev
+```
+
+That starts two things: Vite on 5173 and the API on 3001, with Vite proxying
+`/api` across. In production Vercel runs the files in `/api` as serverless
+functions and there is no proxy; `api/_lib/dev-server.mjs` exists only to give
+the same routing in development, so you do not need the Vercel CLI.
+
+`npm test` runs `db/smoke-test.mjs`, which exercises the real route handlers
+against this database: the sub-skill gate, cross-teacher isolation, the
+return/revise/approve loop and its audit trail, per-sub-skill rating upserts,
+and student-to-student privacy.

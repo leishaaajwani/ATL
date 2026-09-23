@@ -38,6 +38,13 @@ export async function authenticate(req) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
   if (!token) throw new HttpError(401, 'Missing bearer token')
 
+  // Distinguish "we are misconfigured" from "your token is bad", or a missing
+  // service account reads as an auth failure and sends you debugging the
+  // wrong thing entirely.
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    throw new HttpError(500, 'Server is missing FIREBASE_SERVICE_ACCOUNT', 'NO_SERVICE_ACCOUNT')
+  }
+
   let decoded
   try {
     decoded = await admin().verifyIdToken(token)

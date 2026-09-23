@@ -7,7 +7,15 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
       'Cross-Origin-Embedder-Policy': 'require-corp',
-    }
+    },
+    // In production Vercel serves /api as functions. Locally they run on
+    // api/_lib/dev-server.mjs, which `npm run dev` starts alongside Vite.
+    proxy: {
+      '/api': {
+        target: `http://localhost:${process.env.API_PORT ?? 3001}`,
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     rollupOptions: {
