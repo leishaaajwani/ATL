@@ -31,7 +31,7 @@ export default function UnitPlanning() {
   useEffect(() => {
     if (!sectionId || !section) return
     setLoading(true)
-    Promise.all([getUnits(sectionId), getSubskills(section.subjectId)])
+    Promise.all([getUnits(sectionId), getSubskills(section.subjectId, section.grade)])
       .then(([u, s]) => { setUnits(u.units); setCatalogue(s.categories) })
       .catch(err => toast.error(err.message))
       .finally(() => setLoading(false))
@@ -83,6 +83,7 @@ export default function UnitPlanning() {
               <NewUnitForm
                 sectionId={Number(sectionId)}
                 subjectName={section.subjectName}
+                grade={section.grade}
                 catalogue={catalogue}
                 onDone={async () => { setCreating(false); await reload() }}
               />
@@ -96,7 +97,7 @@ export default function UnitPlanning() {
   )
 }
 
-function NewUnitForm({ sectionId, subjectName, catalogue, onDone }) {
+function NewUnitForm({ sectionId, subjectName, grade, catalogue, onDone }) {
   const [name, setName]         = useState('')
   const [term, setTerm]         = useState('Term 1')
   const [picked, setPicked]     = useState(new Set())
@@ -151,8 +152,9 @@ function NewUnitForm({ sectionId, subjectName, catalogue, onDone }) {
           <span className="text-xs text-slate-400">{picked.size} tagged</span>
         </div>
         <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-          Sub-skills written for {subjectName} are marked. Students see only what
-          you tick here, so leave out anything this unit does not genuinely develop.
+          Showing {grade?.startsWith('MYP') ? 'MYP' : 'DP'} sub-skills for {subjectName}.
+          The marked ones are written for this subject specifically. Students see
+          only what you tick, so leave out anything this unit does not genuinely develop.
         </p>
 
         <div className="space-y-4">

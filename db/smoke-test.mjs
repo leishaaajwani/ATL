@@ -35,7 +35,19 @@ sec('Setting up test data')
 const yearId = (await q(`SELECT id FROM academic_years WHERE is_current=1`))[0].id
 const chem   = (await q(`SELECT id FROM subjects WHERE name='Chemistry'`))[0].id
 
-await q(`DELETE FROM users WHERE email LIKE 'smoke+%'`)
+// Clear residue from any earlier run, in dependency order. A previous run that
+// died mid-way leaves sections pointing at its teacher, and those block the
+// user delete, so the next run starts dirty and fails on setup rather than on
+// anything real.
+const stale = (await q(`SELECT id FROM users WHERE email LIKE 'smoke+%'`)).map(u => u.id)
+if (stale.length) {
+  const ph = stale.map(() => '?').join(',')
+  await q(`DELETE FROM sections    WHERE teacher_id IN (${ph})`, stale)
+  await q(`DELETE FROM enrollments WHERE student_id IN (${ph})`, stale)
+  await q(`DELETE FROM reflections WHERE student_id IN (${ph})`, stale)
+  await q(`DELETE FROM users       WHERE id         IN (${ph})`, stale)
+}
+
 const mk = async (email, name, role) =>
   (await q(`INSERT INTO users (email, full_name, role, status, google_sub)
             VALUES (?,?,?,'active',?)`, [email, name, role, 'stub_'+email])).insertId
@@ -82,18 +94,31 @@ r = await call(enrollments, { method: 'PATCH', body: { enrollmentId: enrolId, ac
 ok('teacher confirmed enrolment', r.body.status === 'active')
 
 // ── 3. Subject-specific sub-skills ──────────────────────────────────────────
-sec('3. Chemistry offers subject-specific sub-skills')
-r = await call(subskills, { query: { subjectId: chem } })
+sec('3. Chemistry offers subject-specific sub-skills, split by programme')
+// The grade decides the programme, exactly as the real client sends it.
+r = await call(subskills, { query: { subjectId: chem, grade: 'DP1' } })
 const thinking = r.body.categories.find(c => c.categoryName === 'Thinking')
 const chemOnly = thinking.subskills.filter(s => s.isSubjectSpecific)
-ok('Thinking has Chemistry-specific sub-skills', chemOnly.length === 5)
+ok('programme resolved from grade', r.body.programme === 'DP')
+ok('Thinking has Chemistry-specific sub-skills', chemOnly.length > 0)
 ok('subject-specific sorted first', thinking.subskills[0].isSubjectSpecific === true)
 ok('generic ones still offered', thinking.subskills.some(s => !s.isSubjectSpecific))
-console.log(`       e.g. "${chemOnly[0].name}"`)
+console.log(`       DP e.g. "${chemOnly[0].name}"`)
+
+const rMyp = await call(subskills, { query: { subjectId: chem, grade: 'MYP4' } })
+const mypThinking = rMyp.body.categories.find(c => c.categoryName === 'Thinking')
+const mypChemOnly = mypThinking.subskills.filter(s => s.isSubjectSpecific)
+ok('MYP grade resolves to the MYP programme', rMyp.body.programme === 'MYP')
+ok('MYP gets a different Chemistry set',
+   mypChemOnly.length > 0 &&
+   !mypChemOnly.some(m => chemOnly.some(d => d.name === m.name)))
+console.log(`       MYP e.g. "${mypChemOnly[0].name}"`)
 
 // ── 4. Unit planning with tagged sub-skills ─────────────────────────────────
 sec('4. Teacher plans a unit tagging 4 sub-skills, threshold 3')
-const tagged = [...chemOnly.slice(0, 3), thinking.subskills.at(-1)].map(s => s.id)
+// Three subject-specific plus one generic, all valid for a DP Chemistry class.
+const generic = thinking.subskills.find(s => !s.isSubjectSpecific)
+const tagged = [...chemOnly.slice(0, 3), generic].map(s => s.id)
 r = await call(units, { method: 'POST', body: {
   sectionId, term: 'Term 1', name: 'Rates of Reaction',
   subskillIds: tagged, minSubskills: 3 } })
@@ -110,6 +135,11 @@ const litOnly = (await q(
 r = await call(units, { method: 'POST', body: {
   sectionId, term: 'Term 1', name: 'Wrong Subject', subskillIds: [litOnly], minSubskills: 1 } })
 ok('rejects a Literature sub-skill on a Chemistry unit', r.statusCode === 400)
+
+r = await call(units, { method: 'POST', body: {
+  sectionId, term: 'Term 1', name: 'Wrong Programme',
+  subskillIds: [mypChemOnly[0].id], minSubskills: 1 } })
+ok('rejects an MYP sub-skill on a DP class', r.statusCode === 400)
 
 // ── 5. The gate ─────────────────────────────────────────────────────────────
 sec('5. Reflection is gated on ticking enough sub-skills')
@@ -212,11 +242,25 @@ r = await call(ratings, { query: {} })
 ok('ratings hidden until the term report is published', (r.body.ratings ?? []).length === 0)
 
 // ── Clean up ────────────────────────────────────────────────────────────────
-// Sections reference the teacher, so they go first. The FK refusing to let a
-// teacher vanish out from under their classes is the protection the old
-// Firestore data did not have: that is how 19 entries got orphaned.
-await q(`DELETE FROM sections WHERE teacher_id IN (SELECT id FROM users WHERE email LIKE 'smoke+%')`)
-await q(`DELETE FROM users WHERE email LIKE 'smoke+%'`)
+// Teardown runs in explicit dependency order. Collect the ids first: deleting
+// users by a LIKE pattern after their sections are gone is fragile, because any
+// row that failed to delete leaves the whole teardown wedged behind a foreign
+// key, and the next run then starts dirty.
+const testUsers = await q(`SELECT id FROM users WHERE email LIKE 'smoke+%'`)
+const testIds = testUsers.map(u => u.id)
+
+if (testIds.length) {
+  const ph = testIds.map(() => '?').join(',')
+  // sections cascade to units -> reflections -> ticks, answers, events, evidence
+  await q(`DELETE FROM sections    WHERE teacher_id IN (${ph})`, testIds)
+  await q(`DELETE FROM enrollments WHERE student_id IN (${ph})`, testIds)
+  await q(`DELETE FROM reflections WHERE student_id IN (${ph})`, testIds)
+  await q(`DELETE FROM users       WHERE id         IN (${ph})`, testIds)
+
+  const left = await q(`SELECT COUNT(*) AS n FROM users WHERE email LIKE 'smoke+%'`)
+  if (Number(left[0].n) > 0) console.log(`  ! teardown left ${left[0].n} test users behind`)
+}
+
 __setAuthenticatorForTests(null)
 
 console.log(`\n${fail === 0 ? 'ALL PASSED' : 'FAILURES'}: ${pass} passed, ${fail} failed\n`)

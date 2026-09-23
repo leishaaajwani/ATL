@@ -16,9 +16,15 @@ export default handler({ methods: ['GET', 'POST'] }, async (req, res, user) => {
     const subjectId = Number(req.query.subjectId)
     if (!subjectId) throw new HttpError(400, 'subjectId is required')
 
+    // Programme comes from the grade being taught. An MYP 3 class must not be
+    // offered "deducing a mechanism from kinetic evidence", and a DP class
+    // should not see "spotting a pattern in your results".
+    const grade = String(req.query.grade ?? '')
+    const programme = grade.startsWith('MYP') ? 'MYP' : grade.startsWith('DP') ? 'DP' : null
+
     const rows = await q(
       `SELECT ss.id, ss.name, ss.descriptor, ss.subject_id AS subjectId,
-              ss.created_by AS createdBy,
+              ss.programme, ss.created_by AS createdBy,
               c.id   AS categoryId,
               c.name AS categoryName,
               c.colour, c.bg_colour AS bgColour, c.sort_order AS sortOrder,
@@ -27,8 +33,9 @@ export default handler({ methods: ['GET', 'POST'] }, async (req, res, user) => {
          JOIN atl_categories c ON c.id = ss.category_id
         WHERE ss.is_active = 1
           AND (ss.subject_id = ? OR ss.subject_id IS NULL)
+          ${programme ? 'AND (ss.programme = ? OR ss.programme IS NULL)' : ''}
         ORDER BY c.sort_order, isSubjectSpecific DESC, ss.name`,
-      [subjectId],
+      programme ? [subjectId, programme] : [subjectId],
     )
 
     // Group by category so the unit planner can render sections directly
@@ -49,12 +56,13 @@ export default handler({ methods: ['GET', 'POST'] }, async (req, res, user) => {
         id: row.id,
         name: row.name,
         descriptor: row.descriptor,
+        programme: row.programme,
         isSubjectSpecific: Boolean(row.isSubjectSpecific),
         isSchoolAuthored: row.createdBy !== null,
       })
     }
 
-    return res.json({ subjectId, categories: byCategory })
+    return res.json({ subjectId, programme, categories: byCategory })
   }
 
   // POST

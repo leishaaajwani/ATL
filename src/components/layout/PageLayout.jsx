@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu } from 'lucide-react'
 import Sidebar from './Sidebar'
+import Crest from './Crest'
 
 export default function PageLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -37,15 +38,19 @@ export default function PageLayout({ children }) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile top bar */}
-        <div className="lg:hidden flex items-center px-4 py-3 bg-white border-b border-slate-100">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors"
-          >
-            <Menu size={20} />
-          </button>
-          <span className="ml-3 text-sm font-semibold text-slate-900">ATL Nexus</span>
+        {/* Mobile top bar, same navy-and-gold as the sidebar */}
+        <div className="lg:hidden bg-navy-900">
+          <div className="h-1 bg-gold-500" />
+          <div className="flex items-center px-4 py-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-xl text-navy-100 hover:bg-navy-800 transition-colors"
+            >
+              <Menu size={20} />
+            </button>
+            <Crest size={22} className="ml-2" />
+            <span className="ml-2 text-sm font-semibold text-white">ATL Tracker</span>
+          </div>
         </div>
 
         {/* Scrollable page area */}

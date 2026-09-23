@@ -67,7 +67,7 @@ export async function getSubjects() {
   return subjectsCache
 }
 
-export const getSubskills   = subjectId => get('/subskills', { subjectId })
+export const getSubskills   = (subjectId, grade) => get('/subskills', { subjectId, grade })
 export const createSubskill = payload   => post('/subskills', payload)
 
 // ── Classes ─────────────────────────────────────────────────────────────────
@@ -93,6 +93,45 @@ export const submitReflection = payload => post('/reflections', payload)
 export const getReviewQueue = (status = 'pending') => get('/review-queue', { status })
 export const reviewReflection = (reflectionId, action, feedback) =>
   post('/reflections/review', { reflectionId, action, feedback })
+
+// ── Evidence ────────────────────────────────────────────────────────────────
+
+export const MAX_EVIDENCE_BYTES = 8 * 1024 * 1024
+
+export const ACCEPTED_EVIDENCE = [
+  'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/gif',
+  'application/pdf', 'text/plain', 'text/csv',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]
+
+export const listEvidence = reflectionId => get('/evidence', { reflectionId })
+export const deleteEvidence = id => request('/evidence', { method: 'DELETE', body: { id } })
+
+// The server wants base64 in a JSON body, so read the File here rather than
+// building a FormData the serverless handler would have to parse.
+export function evidenceUrl(id) {
+  return `${BASE}/evidence?id=${id}&download=1`
+}
+
+export async function uploadEvidence({ file, unitId, subskillId = null }) {
+  if (file.size > MAX_EVIDENCE_BYTES) {
+    throw new ApiError(400, `${file.name} is over 8 MB`)
+  }
+  const dataBase64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new ApiError(400, `Could not read ${file.name}`))
+    reader.onload = () => resolve(String(reader.result).split(',')[1])
+    reader.readAsDataURL(file)
+  })
+  return post('/evidence', {
+    unitId,
+    subskillId,
+    fileName: file.name,
+    contentType: file.type || 'application/octet-stream',
+    dataBase64,
+  })
+}
 
 // ── Ratings ─────────────────────────────────────────────────────────────────
 

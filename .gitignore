@@ -24,3 +24,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local evidence uploads (dev storage backend)
+.uploads/

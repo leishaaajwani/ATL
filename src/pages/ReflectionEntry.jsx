@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Check, Lock, CheckCircle2 } from 'lucide-react'
-import { getMyUnits, getMyReflection, submitReflection } from '../api/client'
+import { getMyUnits, getMyReflection, submitReflection, listEvidence } from '../api/client'
+import EvidenceDropbox from '../components/EvidenceDropbox'
 import { PageLoader } from '../components/ui/LoadingSpinner'
 import PageLayout from '../components/layout/PageLayout'
 import { ASSESSMENT_LEVELS } from '../utils/atlFramework'
@@ -25,6 +26,7 @@ export default function ReflectionEntry() {
   const [answers, setAnswers] = useState({})   // promptId -> text
   const [prompts, setPrompts] = useState([])
   const [existing, setExisting] = useState(null)
+  const [evidence, setEvidence] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
 
@@ -44,8 +46,9 @@ export default function ReflectionEntry() {
   useEffect(() => {
     if (!unitId) { setTicks({}); setAnswers({}); setExisting(null); return }
     getMyReflection(unitId)
-      .then(r => {
+      .then(async r => {
         setExisting(r.reflection)
+        setEvidence(r.reflection ? (await listEvidence(r.reflection.id)).files : [])
         if (r.reflection) {
           setTicks(Object.fromEntries(r.reflection.ticks.map(t =>
             [t.subskillId, { selfLevel: t.selfLevel, evidenceNote: t.evidenceNote }])))
@@ -56,6 +59,13 @@ export default function ReflectionEntry() {
       })
       .catch(() => {})
   }, [unitId])
+
+  // The dropbox opens a draft reflection on first upload, so re-read both.
+  async function refreshEvidence() {
+    const r = await getMyReflection(unitId)
+    setExisting(r.reflection)
+    setEvidence(r.reflection ? (await listEvidence(r.reflection.id)).files : [])
+  }
 
   // The prompt list is fixed school-wide, so read it off any loaded reflection,
   // and fall back to the canonical three when there is no reflection yet.
@@ -197,6 +207,9 @@ export default function ReflectionEntry() {
                       disabled={locked}
                       onToggle={() => ticks[ss.id] ? clearTick(ss.id) : setTick(ss.id, { selfLevel: 'Developing', evidenceNote: '' })}
                       onChange={patch => setTick(ss.id, patch)}
+                      unitId={Number(unitId)}
+                      evidence={evidence}
+                      onEvidenceChange={refreshEvidence}
                     />
                   ))}
                 </div>
@@ -263,7 +276,8 @@ export default function ReflectionEntry() {
   )
 }
 
-function SubskillRow({ subskill, value, disabled, onToggle, onChange }) {
+function SubskillRow({ subskill, value, disabled, onToggle, onChange,
+                      unitId, evidence, onEvidenceChange }) {
   const on = Boolean(value)
   return (
     <div className={`rounded-xl border transition-colors ${on ? 'border-navy-200 bg-navy-50/40' : 'border-slate-100'}`}>
@@ -305,6 +319,13 @@ function SubskillRow({ subskill, value, disabled, onToggle, onChange }) {
           {value.evidenceNote && value.evidenceNote.trim().length < 10 && (
             <p className="text-[11px] text-gold-700">A bit more detail, at least a few words.</p>
           )}
+          <EvidenceDropbox
+            unitId={unitId}
+            subskillId={subskill.id}
+            files={evidence}
+            onChange={onEvidenceChange}
+            disabled={disabled}
+          />
         </div>
       )}
     </div>

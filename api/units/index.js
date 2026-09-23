@@ -58,19 +58,24 @@ export default handler({ methods: ['GET', 'POST'] }, async (req, res, user) => {
 
   await assertOwnsSection(user.id, sectionId)
 
-  // Every tagged sub-skill must be valid for this section's subject: either
-  // generic, or scoped to that exact subject.
+  // Every tagged sub-skill must be valid on both axes for this section: the
+  // right subject, and the right programme for the grade being taught.
   const valid = await q(
     `SELECT ss.id
        FROM atl_subskills ss
        JOIN sections s ON s.id = ?
       WHERE ss.id IN (${subskillIds.map(() => '?').join(',')})
         AND ss.is_active = 1
-        AND (ss.subject_id = s.subject_id OR ss.subject_id IS NULL)`,
+        AND (ss.subject_id = s.subject_id OR ss.subject_id IS NULL)
+        AND (ss.programme IS NULL
+             OR ss.programme = IF(s.grade LIKE 'MYP%', 'MYP', 'DP'))`,
     [sectionId, ...subskillIds],
   )
   if (valid.length !== subskillIds.length) {
-    throw new HttpError(400, 'One of those sub-skills does not belong to this subject')
+    throw new HttpError(
+      400,
+      'One of those sub-skills does not belong to this subject or programme',
+    )
   }
 
   const unitId = await tx(async ({ q: tq }) => {

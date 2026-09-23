@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, RotateCcw, ChevronDown, Sparkles } from 'lucide-react'
-import { getReviewQueue, reviewReflection } from '../api/client'
+import { getReviewQueue, reviewReflection, listEvidence } from '../api/client'
+import { EvidenceList } from '../components/EvidenceDropbox'
 import PageLayout from '../components/layout/PageLayout'
 import Modal from '../components/ui/Modal'
 import { PageLoader } from '../components/ui/LoadingSpinner'
@@ -72,9 +73,16 @@ export default function ApprovalReview() {
 
 function ReflectionCard({ reflection: r, onDone }) {
   const [open, setOpen]     = useState(false)
+  const [files, setFiles]   = useState([])
   const [modal, setModal]   = useState(null)   // 'approve' | 'return'
   const [feedback, setFb]   = useState('')
   const [busy, setBusy]     = useState(false)
+
+  // Only fetch evidence when the card is actually opened.
+  useEffect(() => {
+    if (!open || files.length) return
+    listEvidence(r.id).then(d => setFiles(d.files)).catch(() => {})
+  }, [open])
 
   async function submit() {
     setBusy(true)
@@ -147,6 +155,12 @@ function ReflectionCard({ reflection: r, onDone }) {
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 leading-relaxed">{t.evidenceNote}</p>
+                        <div className="mt-2">
+                          <EvidenceList
+                            files={files.filter(f => f.subskillId === t.subskillId)}
+                            label="Attached"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -163,6 +177,9 @@ function ReflectionCard({ reflection: r, onDone }) {
                     </div>
                   ))}
                 </div>
+
+                <EvidenceList files={files.filter(f => f.subskillId === null)}
+                  label="Evidence for the whole unit" />
 
                 {r.teacherFeedback && (
                   <div className="rounded-xl bg-navy-50 p-3">
