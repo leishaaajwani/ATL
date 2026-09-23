@@ -1,4 +1,13 @@
 /** @type {import('tailwindcss').Config} */
+
+// Palette derived from GEMS Modern Academy brand assets:
+//   * School site header navy   #0A1E43  -> navy.900
+//   * School site gold bar      #A67C1F  -> gold.700
+//   * Modern Eventure cards     #123A8A  -> navy.700
+//   * Modern Eventure CTA gold  #D9A441  -> gold.500
+// Navy carries structure (headers, nav, text). Gold carries action (primary
+// buttons, active tab states). Green is reserved for confirmed/approved only.
+
 export default {
   content: [
     "./index.html",
@@ -8,26 +17,41 @@ export default {
     extend: {
       colors: {
         navy: {
-          50:  '#f0f4ff',
-          100: '#e0e9ff',
-          200: '#c0d3ff',
-          300: '#90b1ff',
-          400: '#5585ff',
-          500: '#2b5fff',
-          600: '#1a3ef5',
-          700: '#142fd6',
-          800: '#1227a8',
-          900: '#0f2282',
-          950: '#0a1650',
+          50:  '#f2f6fc',
+          100: '#e1e9f8',
+          200: '#c2d2f0',
+          300: '#8fade5',
+          400: '#5583d6',
+          500: '#2a5fc4',
+          600: '#1a4aa8',
+          700: '#123a8a',   // Eventure feature surface
+          800: '#0e2a5c',
+          900: '#0a1e43',   // school site header
+          950: '#050f22',
         },
+        gold: {
+          50:  '#fdf9f0',
+          100: '#fbf3e3',
+          200: '#f6e4c4',
+          300: '#efd199',
+          400: '#e4ba6b',
+          500: '#d9a441',   // Eventure primary CTA
+          600: '#bf9130',
+          700: '#a67c1f',   // school site gold bar
+          800: '#8a661a',
+          900: '#6b4e0f',
+        },
+        // Semantic aliases so components stop hardcoding hex values
+        ink:     '#0a1e43',
+        parchment: '#fdfdfb',
       },
       fontFamily: {
         sans: ['"Inter"', 'system-ui', '-apple-system', 'sans-serif'],
       },
       boxShadow: {
-        card:      '0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
-        'card-md': '0 4px 12px 0 rgb(0 0 0 / 0.08), 0 2px 4px -1px rgb(0 0 0 / 0.06)',
-        'card-lg': '0 10px 30px -5px rgb(0 0 0 / 0.1), 0 4px 8px -4px rgb(0 0 0 / 0.06)',
+        card:      '0 1px 2px 0 rgb(10 30 67 / 0.05)',
+        'card-md': '0 4px 12px -2px rgb(10 30 67 / 0.08)',
+        'card-lg': '0 12px 32px -8px rgb(10 30 67 / 0.12)',
       },
       borderRadius: {
         '2xl': '1rem',

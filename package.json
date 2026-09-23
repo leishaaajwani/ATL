@@ -12,8 +12,10 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "firebase": "^12.13.0",
+    "firebase-admin": "^13.10.0",
     "framer-motion": "^12.39.0",
     "lucide-react": "^1.16.0",
+    "mysql2": "^3.24.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-hot-toast": "^2.6.0",
