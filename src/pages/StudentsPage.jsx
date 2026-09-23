@@ -1,148 +1,156 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { subscribeToStudents } from '../firebase/firestore'
-import { useAllEntries } from '../hooks/useATLEntries'
+import { Link } from 'react-router-dom'
+import { Check, X, Clock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { getRoster, decideEnrollment } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
-import { ATL_CATEGORIES, ATL_CATEGORY_KEYS } from '../utils/atlFramework'
-import { average, getMyStudents } from '../utils/helpers'
-import { FileText } from 'lucide-react'
-
-const GRADE_TABS = ['All', 'DP1', 'DP2']
+import { PageLoader } from '../components/ui/LoadingSpinner'
+import toast from 'react-hot-toast'
 
 export default function StudentsPage() {
-  const { userDoc } = useAuth()
-  const [allStudents, setAllStudents] = useState([])
-  const { entries } = useAllEntries()
-  const [gradeFilter, setGradeFilter] = useState('All')
+  const { profile, refresh } = useAuth()
+  const sections = profile?.sections ?? []
 
-  useEffect(() => {
-    const unsub = subscribeToStudents(setAllStudents)
-    return unsub
-  }, [])
+  const [picked_, setSectionId]   = useState('')
+  const [students, setStudents]   = useState([])
+  const [loading, setLoading]     = useState(false)
 
-  // Only show students who selected this teacher for one of their subjects
-  const myStudents = getMyStudents(userDoc?.displayName, userDoc?.teachingGroups, allStudents)
+  // Derive rather than sync: first class is the default until one is picked.
+  const sectionId = picked_ || (sections[0] ? String(sections[0].id) : '')
 
-  // Grade filter
-  const displayed = gradeFilter === 'All'
-    ? myStudents
-    : myStudents.filter(s => s.grade === gradeFilter)
 
-  // Sort alphabetically
-  const sorted = [...displayed].sort((a, b) =>
-    (a.displayName ?? '').localeCompare(b.displayName ?? ''),
-  )
+  async function load() {
+    if (!sectionId) return
+    setLoading(true)
+    try { setStudents((await getRoster(sectionId)).students) }
+    catch (err) { toast.error(err.message) }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [sectionId])
+
+  async function decide(enrollmentId, action) {
+    try {
+      await decideEnrollment(enrollmentId, action)
+      toast.success(action === 'approve' ? 'Added to your class' : 'Removed')
+      await refresh()
+      await load()
+    } catch (err) { toast.error(err.message) }
+  }
+
+  if (!sections.length) {
+    return (
+      <PageLayout>
+        <div className="card p-10 text-center max-w-md mx-auto">
+          <p className="text-sm font-medium text-slate-800">No classes yet</p>
+          <Link to="/setup"><button className="btn-primary mt-4">Set up classes</button></Link>
+        </div>
+      </PageLayout>
+    )
+  }
+
+  const pending = students.filter(s => s.enrollmentStatus === 'pending')
+  const active  = students.filter(s => s.enrollmentStatus === 'active')
 
   return (
     <PageLayout>
       <div className="space-y-5">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="page-title">My Students</h1>
+            <h1 className="page-title">Students</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              {myStudents.length} student{myStudents.length !== 1 ? 's' : ''} in your classes
+              Confirm who is actually in your class
             </p>
           </div>
-          <Link to="/reports" className="btn-ghost text-sm flex items-center gap-1.5 border border-slate-200 px-3 py-2 rounded-xl">
-            <FileText size={14} />
-            Term Reports
-          </Link>
+          <select className="input-base w-auto min-w-[220px]" value={sectionId}
+            onChange={e => setSectionId(e.target.value)}>
+            {sections.map(s => (
+              <option key={s.id} value={s.id}>{s.subjectName} · {s.grade}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Grade filter tabs */}
-        <div className="flex gap-2">
-          {GRADE_TABS.map(g => (
-            <button
-              key={g}
-              onClick={() => setGradeFilter(g)}
-              className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-all ${
-                gradeFilter === g
-                  ? 'bg-navy-700 text-white'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
-              }`}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid gap-4">
-          {sorted.length === 0 ? (
-            <div className="card p-10 text-center">
-              <p className="text-sm font-medium text-slate-600">No students yet</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Students will appear here once they sign up and select you as their teacher.
-              </p>
-            </div>
-          ) : sorted.map((student, i) => {
-            const sEntries = entries.filter(e => e.studentId === student.id)
-            const approved = sEntries.filter(e => e.approvalStatus === 'approved')
-            const pending  = sEntries.filter(e => e.approvalStatus === 'pending')
-
-            const catAverages = ATL_CATEGORY_KEYS.reduce((acc, cat) => {
-              const catE = approved.filter(e => e.atlCategory === cat)
-              const scores = catE.map(e => e.teacherScore ?? e.score)
-              acc[cat] = scores.length ? average(scores) : null
-              return acc
-            }, {})
-
-            return (
-              <motion.div
-                key={student.id}
-                className="card p-5"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-              >
-                {/* Student header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    {student.photoURL
-                      ? <img src={student.photoURL} alt="" className="w-10 h-10 rounded-full" />
-                      : <div className="w-10 h-10 rounded-full bg-navy-100 flex items-center justify-center text-navy-700 font-semibold">
-                          {(student.displayName ?? '?')[0]}
-                        </div>
-                    }
-                    <div>
-                      <p className="font-semibold text-slate-900">{student.displayName}</p>
-                      <p className="text-xs text-slate-400">{student.grade} · {student.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="badge bg-green-50 text-green-700">{approved.length} approved</span>
-                    {pending.length > 0 && (
-                      <span className="badge bg-amber-50 text-amber-700">{pending.length} pending</span>
-                    )}
-                  </div>
+        {loading ? <PageLoader /> : (
+          <>
+            {pending.length > 0 && (
+              <div className="card p-4 border-gold-200 bg-gold-50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock size={15} className="text-gold-700" />
+                  <p className="text-sm font-semibold text-navy-900">
+                    {pending.length} awaiting your confirmation
+                  </p>
                 </div>
-
-                {/* ATL category mini-bars */}
-                <div className="grid grid-cols-5 gap-2">
-                  {ATL_CATEGORY_KEYS.map(cat => {
-                    const { color } = ATL_CATEGORIES[cat]
-                    const val = catAverages[cat]
-                    return (
-                      <div key={cat} className="text-center">
-                        <div className="w-full bg-slate-100 rounded-full h-1.5 mb-1">
-                          <div
-                            className="h-1.5 rounded-full transition-all duration-500"
-                            style={{ width: val ? `${(val / 4) * 100}%` : '0%', backgroundColor: color }}
-                          />
-                        </div>
-                        <p className="text-[10px] text-slate-400 truncate">{cat.split('-')[0]}</p>
-                        <p className="text-[11px] font-medium" style={{ color }}>
-                          {val ? val.toFixed(1) : '—'}
-                        </p>
+                <div className="space-y-2">
+                  {pending.map(s => (
+                    <motion.div key={s.enrollmentId} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      className="bg-white rounded-xl p-3 border border-gold-200/60 flex items-center justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900">{s.fullName}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{s.email}</p>
                       </div>
-                    )
-                  })}
+                      <div className="flex gap-1.5 shrink-0">
+                        <button className="p-2 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
+                          title="Not my student" onClick={() => decide(s.enrollmentId, 'drop')}>
+                          <X size={15} />
+                        </button>
+                        <button className="p-2 rounded-lg bg-navy-900 text-white hover:bg-navy-800 transition-colors"
+                          title="Confirm" onClick={() => decide(s.enrollmentId, 'approve')}>
+                          <Check size={15} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
-              </motion.div>
-            )
-          })}
-        </div>
+              </div>
+            )}
+
+            {active.length === 0 ? (
+              <div className="card p-10 text-center">
+                <p className="text-sm font-medium text-slate-800">No confirmed students</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                  Students pick their own classes during setup, and appear here for you to confirm.
+                </p>
+              </div>
+            ) : (
+              <div className="card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/60">
+                        <th className="text-left py-2.5 px-4 text-xs font-medium text-slate-500">Student</th>
+                        <th className="text-center py-2.5 px-4 text-xs font-medium text-slate-500">Approved</th>
+                        <th className="text-center py-2.5 px-4 text-xs font-medium text-slate-500">Awaiting</th>
+                        <th className="py-2.5 px-4" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {active.map(s => (
+                        <tr key={s.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-4">
+                            <p className="font-medium text-slate-900">{s.fullName}</p>
+                            <p className="text-xs text-slate-500">{s.email}</p>
+                          </td>
+                          <td className="py-3 px-4 text-center text-emerald-600 font-medium">{s.approvedCount}</td>
+                          <td className="py-3 px-4 text-center">
+                            {s.pendingCount > 0
+                              ? <span className="badge bg-gold-100 text-gold-800">{s.pendingCount}</span>
+                              : <span className="text-slate-300">0</span>}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button className="text-xs text-slate-400 hover:text-rose-600 transition-colors"
+                              onClick={() => decide(s.enrollmentId, 'drop')}>
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </PageLayout>
   )

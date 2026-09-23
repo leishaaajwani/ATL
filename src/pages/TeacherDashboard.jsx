@@ -1,249 +1,186 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Clock, CheckCircle, Users, TrendingUp, ArrowRight, BarChart3 } from 'lucide-react'
-import { useAllEntries, usePendingEntries } from '../hooks/useATLEntries'
-import { useAnalytics } from '../hooks/useAnalytics'
-import { subscribeToStudents } from '../firebase/firestore'
+import { Clock, CheckCircle2, Users, BookMarked, ArrowRight, UserPlus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { getReviewQueue, getRoster, decideEnrollment } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
 import Card, { CardHeader } from '../components/ui/Card'
-import Button from '../components/ui/Button'
-import { LevelBadge, CategoryBadge, StatusBadge } from '../components/ui/Badge'
-import ChartContainer from '../components/charts/ChartContainer'
-import { ATL_CATEGORIES, ATL_CATEGORY_KEYS } from '../utils/atlFramework'
-import { formatDate, truncate, getMyStudents } from '../utils/helpers'
-import { useEffect, useState } from 'react'
+import { PageLoader } from '../components/ui/LoadingSpinner'
+import { formatDate } from '../utils/helpers'
+import toast from 'react-hot-toast'
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
 
 export default function TeacherDashboard() {
-  const { userDoc } = useAuth()
-  const { entries: allEntries, loading } = useAllEntries()
-  const { entries: allPending } = usePendingEntries()
-  const [allStudents, setAllStudents] = useState([])
+  const { profile, refresh } = useAuth()
+  const sections = profile?.sections ?? []
 
-  useEffect(() => {
-    const unsub = subscribeToStudents(setAllStudents)
-    return unsub
-  }, [])
+  const [queue, setQueue]     = useState([])
+  const [pendingEnrol, setPE] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  // Filter to only this teacher's students
-  const students = getMyStudents(userDoc?.displayName, userDoc?.teachingGroups, allStudents)
-  const myStudentIds = new Set(students.map(s => s.id))
-
-  // Filter entries to this teacher's students only
-  const myEntries = allEntries.filter(e => myStudentIds.has(e.studentId))
-  const pendingEntries = allPending.filter(e => myStudentIds.has(e.studentId))
-
-  const analytics = useAnalytics(myEntries)
-
-  // Per-student summary
-  const studentSummaries = students.map(s => {
-    const sEntries = myEntries.filter(e => e.studentId === s.id)
-    const approved = sEntries.filter(e => e.approvalStatus === 'approved')
-    const scores   = approved.map(e => e.teacherScore ?? e.score)
-    const avg      = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null
-    return {
-      ...s,
-      totalEntries: sEntries.length,
-      approvedCount: approved.length,
-      pendingCount: sEntries.filter(e => e.approvalStatus === 'pending').length,
-      average: avg,
+  async function load() {
+    try {
+      const [q, ...rosters] = await Promise.all([
+        getReviewQueue('pending'),
+        ...sections.filter(s => s.pendingStudents > 0).map(s =>
+          getRoster(s.id).then(r => ({ section: s, students: r.students }))),
+      ])
+      setQueue(q.reflections)
+      setPE(rosters.flatMap(({ section, students }) =>
+        students.filter(st => st.enrollmentStatus === 'pending')
+          .map(st => ({ ...st, section }))))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLoading(false)
     }
-  })
+  }
+  useEffect(() => { if (sections.length) load(); else setLoading(false) }, [profile])
+
+  async function decide(enrollmentId, action) {
+    try {
+      await decideEnrollment(enrollmentId, action)
+      toast.success(action === 'approve' ? 'Student added to your class' : 'Request declined')
+      await refresh()
+      await load()
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const totalStudents = sections.reduce((n, s) => n + Number(s.activeStudents ?? 0), 0)
+
+  if (loading) return <PageLoader />
 
   return (
     <PageLayout>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-        {/* Header */}
-        <motion.div variants={item} className="flex items-center justify-between">
+        <motion.div variants={item} className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="page-title">Class Overview</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Monitor student ATL progress and manage approvals</p>
+            <h1 className="page-title">
+              {profile?.fullName?.split(' ')[0]}'s classes
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {sections.length} {sections.length === 1 ? 'class' : 'classes'} · {totalStudents} students
+            </p>
           </div>
-          <Link to="/approvals">
-            <Button icon={<CheckCircle size={15} />}>
-              Review Approvals
-              {pendingEntries.length > 0 && (
-                <span className="ml-1 bg-white text-navy-700 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {pendingEntries.length}
-                </span>
-              )}
-            </Button>
-          </Link>
+          {queue.length > 0 && (
+            <Link to="/approvals">
+              <button className="btn-accent">
+                Review {queue.length} {queue.length === 1 ? 'reflection' : 'reflections'}
+              </button>
+            </Link>
+          )}
         </motion.div>
 
-        {/* Stats */}
+        {/* Enrolment requests are the thing that blocks a class from being real */}
+        {pendingEnrol.length > 0 && (
+          <motion.div variants={item} className="card p-4 border-gold-200 bg-gold-50">
+            <div className="flex items-center gap-2 mb-3">
+              <UserPlus size={15} className="text-gold-700" />
+              <p className="text-sm font-semibold text-navy-900">
+                {pendingEnrol.length} {pendingEnrol.length === 1 ? 'student wants' : 'students want'} to join
+              </p>
+            </div>
+            <div className="space-y-2">
+              {pendingEnrol.map(s => (
+                <div key={s.enrollmentId} className="bg-white rounded-xl p-3 border border-gold-200/60
+                                                    flex items-center justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-900">{s.fullName}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {s.section.subjectName} · {s.section.grade} · {s.email}
+                    </p>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button className="text-xs px-3 py-1.5 rounded-lg text-slate-500 hover:text-rose-600 transition-colors"
+                      onClick={() => decide(s.enrollmentId, 'drop')}>
+                      Not my student
+                    </button>
+                    <button className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-navy-900 text-white hover:bg-navy-800 transition-colors"
+                      onClick={() => decide(s.enrollmentId, 'approve')}>
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         <motion.div variants={item} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatCard label="Students" value={students.length} icon={Users} color="blue" />
-          <StatCard label="Total Entries" value={allEntries.length} icon={BarChart3} color="purple" />
-          <StatCard label="Pending Review" value={pendingEntries.length} icon={Clock} color="amber" urgent={pendingEntries.length > 0} />
-          <StatCard
-            label="Class Avg Score"
-            value={analytics.overallAverage > 0 ? analytics.overallAverage.toFixed(1) : '—'}
-            icon={TrendingUp}
-            color="green"
-            sub="/4"
-          />
+          <Stat label="Classes"  value={sections.length} icon={BookMarked} tone="navy" />
+          <Stat label="Students" value={totalStudents}   icon={Users}      tone="slate" />
+          <Stat label="To review" value={queue.length}   icon={Clock}      tone="gold" />
+          <Stat label="Units" value={sections.reduce((n, s) => n + Number(s.unitCount ?? 0), 0)}
+            icon={CheckCircle2} tone="green" />
         </motion.div>
 
-        {/* Chart + pending preview */}
-        <div className="grid lg:grid-cols-3 gap-5">
-          <motion.div variants={item} className="lg:col-span-2">
-            <ChartContainer
-              radarData={analytics.radarData}
-              termData={analytics.termData}
-              categoryAverages={analytics.categoryAverages}
-              title="Class ATL Performance"
-            />
-          </motion.div>
-
-          {/* Pending queue */}
-          <motion.div variants={item}>
-            <Card className="h-full">
-              <CardHeader
-                title="Pending Approvals"
-                action={
-                  pendingEntries.length > 0 && (
-                    <Link to="/approvals" className="text-xs text-navy-600 hover:underline flex items-center gap-1">
-                      View all <ArrowRight size={11} />
-                    </Link>
-                  )
-                }
-              />
-              {pendingEntries.length === 0 ? (
-                <div className="py-8 flex flex-col items-center gap-2 text-center">
-                  <CheckCircle size={24} className="text-green-400" />
-                  <p className="text-sm text-slate-500">All caught up!</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {pendingEntries.slice(0, 4).map(entry => (
-                    <div key={entry.id} className="p-3 rounded-xl bg-amber-50 border border-amber-100">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-slate-800">{entry.studentName}</span>
-                        <span className="text-[10px] text-slate-400">{formatDate(entry.createdAt)}</span>
-                      </div>
-                      <CategoryBadge category={entry.atlCategory} className="mb-1" />
-                      <p className="text-xs text-slate-600 leading-relaxed">{truncate(entry.reflection, 60)}</p>
-                    </div>
-                  ))}
-                  {pendingEntries.length > 4 && (
-                    <Link to="/approvals" className="block text-center text-xs text-navy-600 hover:underline py-1">
-                      +{pendingEntries.length - 4} more
-                    </Link>
-                  )}
-                </div>
-              )}
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Category averages */}
-        <motion.div variants={item}>
-          <h3 className="section-title mb-3">Class ATL Category Averages</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-            {ATL_CATEGORY_KEYS.map(cat => {
-              const { color, bg } = ATL_CATEGORIES[cat]
-              const val = analytics.categoryAverages[cat]
-              return (
-                <div key={cat} className="card p-4">
-                  <div className="w-8 h-8 rounded-xl mb-3 flex items-center justify-center" style={{ backgroundColor: bg }}>
-                    <span style={{ color }} className="text-sm font-semibold">{cat[0]}</span>
-                  </div>
-                  <p className="text-xs font-medium text-slate-600 leading-tight mb-1">{cat}</p>
-                  <p className="text-xl font-semibold" style={{ color }}>{val > 0 ? val.toFixed(1) : '—'}</p>
-                  <div className="mt-1.5 w-full bg-slate-100 rounded-full h-1">
-                    <div className="h-1 rounded-full" style={{ width: `${(val / 4) * 100}%`, backgroundColor: color }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </motion.div>
-
-        {/* Student progress table */}
         <motion.div variants={item}>
           <Card>
-            <CardHeader title="Student Progress" subtitle={`${students.length} students`} />
-            {studentSummaries.length === 0 ? (
-              <div className="py-8 text-center text-sm text-slate-400">No student data yet.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left py-2.5 px-3 text-xs font-medium text-slate-500">Student</th>
-                      <th className="text-center py-2.5 px-3 text-xs font-medium text-slate-500">Entries</th>
-                      <th className="text-center py-2.5 px-3 text-xs font-medium text-slate-500">Approved</th>
-                      <th className="text-center py-2.5 px-3 text-xs font-medium text-slate-500">Pending</th>
-                      <th className="text-center py-2.5 px-3 text-xs font-medium text-slate-500">Avg Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {studentSummaries.map(s => (
-                      <tr key={s.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-2.5">
-                            {s.photoURL
-                              ? <img src={s.photoURL} alt="" className="w-7 h-7 rounded-full" />
-                              : <div className="w-7 h-7 rounded-full bg-navy-100 flex items-center justify-center text-navy-700 text-xs font-semibold">
-                                  {(s.displayName ?? '?').charAt(0)}
-                                </div>
-                            }
-                            <div>
-                              <p className="font-medium text-slate-900">{s.displayName}</p>
-                              <p className="text-xs text-slate-400">{s.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 text-center text-slate-600">{s.totalEntries}</td>
-                        <td className="py-3 px-3 text-center text-green-600 font-medium">{s.approvedCount}</td>
-                        <td className="py-3 px-3 text-center">
-                          {s.pendingCount > 0
-                            ? <span className="badge bg-amber-50 text-amber-700">{s.pendingCount}</span>
-                            : <span className="text-slate-400">—</span>
-                          }
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          {s.average != null
-                            ? <span className="font-semibold text-navy-700">{s.average.toFixed(1)}</span>
-                            : <span className="text-slate-400">—</span>
-                          }
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <CardHeader title="Your classes" action={
+              <Link to="/units" className="text-xs text-navy-700 hover:underline">Plan units</Link>
+            } />
+            <div className="space-y-2">
+              {sections.map(s => (
+                <Link key={s.id} to="/units">
+                  <div className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900">{s.subjectName}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {s.grade} · {s.activeStudents} students · {s.unitCount ?? 0} units
+                      </p>
+                    </div>
+                    <ArrowRight size={14} className="text-slate-300 shrink-0" />
+                  </div>
+                </Link>
+              ))}
+            </div>
           </Card>
         </motion.div>
+
+        {queue.length > 0 && (
+          <motion.div variants={item}>
+            <Card>
+              <CardHeader title="Waiting on you" action={
+                <Link to="/approvals" className="text-xs text-navy-700 hover:underline">View all</Link>
+              } />
+              <div className="space-y-2">
+                {queue.slice(0, 5).map(r => (
+                  <div key={r.id} className="p-3 rounded-xl bg-slate-50">
+                    <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                      <span className="text-sm font-medium text-slate-900">{r.studentName}</span>
+                      <span className="text-[11px] text-slate-400">{formatDate(r.submittedAt)}</span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {r.subjectName} · {r.unitName} · {r.ticks?.length ?? 0} sub-skills claimed
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+        )}
       </motion.div>
     </PageLayout>
   )
 }
 
-function StatCard({ label, value, icon: Icon, color, sub, urgent }) {
-  const palette = {
-    blue:   { bg: '#eff6ff', color: '#3b82f6' },
-    green:  { bg: '#f0fdf4', color: '#22c55e' },
-    amber:  { bg: '#fffbeb', color: '#f59e0b' },
-    purple: { bg: '#faf5ff', color: '#a855f7' },
+function Stat({ label, value, icon: Icon, tone }) {
+  const tones = {
+    navy:  { bg: '#f2f6fc', fg: '#123a8a' },
+    green: { bg: '#ecfdf5', fg: '#059669' },
+    gold:  { bg: '#fbf3e3', fg: '#a67c1f' },
+    slate: { bg: '#f8fafc', fg: '#475569' },
   }
-  const { bg, color: c } = palette[color]
+  const { bg, fg } = tones[tone]
   return (
-    <div className={`card p-4 ${urgent ? 'border-amber-200' : ''}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: bg }}>
-          <Icon size={15} style={{ color: c }} />
-        </div>
-        {urgent && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
+    <div className="card p-4">
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: bg }}>
+        <Icon size={15} style={{ color: fg }} />
       </div>
-      <p className="text-2xl font-semibold text-slate-900">
-        {value}{sub && <span className="text-sm text-slate-400 font-normal ml-0.5">{sub}</span>}
-      </p>
+      <p className="text-2xl font-semibold text-slate-900">{value}</p>
       <p className="text-xs text-slate-500 mt-0.5">{label}</p>
     </div>
   )

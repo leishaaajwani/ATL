@@ -92,6 +92,20 @@ export async function authenticate(req) {
   return user
 }
 
+// Test seam. Route handlers call `authenticator`, not `authenticate` directly,
+// so the smoke test can supply its own identity without a Firebase key.
+// This is not reachable over HTTP (it is a module export, not a route) and it
+// refuses to work in production, so the only way to use it is to already have
+// code execution on the server.
+let authenticator = authenticate
+
+export function __setAuthenticatorForTests(fn) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('__setAuthenticatorForTests is not available in production')
+  }
+  authenticator = fn ?? authenticate
+}
+
 /**
  * Route wrapper. Handles auth, role gating, JSON errors and method checks.
  *
@@ -105,7 +119,7 @@ export function handler(options, fn) {
         res.setHeader('Allow', methods.join(', '))
         throw new HttpError(405, `${req.method} not allowed here`)
       }
-      const user = await authenticate(req)
+      const user = await authenticator(req)
       if (roles && !roles.includes(user.role)) {
         throw new HttpError(403, 'Your role does not have access to this')
       }

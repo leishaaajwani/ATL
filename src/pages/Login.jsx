@@ -3,30 +3,30 @@ import { motion } from 'framer-motion'
 import { BookOpen } from 'lucide-react'
 import { useState } from 'react'
 import { signInWithGoogle } from '../firebase/auth'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth, homeFor } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import { useEffect } from 'react'
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
-  const { user, userDoc, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading, rejection, needsSetup } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!authLoading && user && userDoc) {
-      if (!userDoc.profileCompleted) {
-        navigate('/onboarding', { replace: true })
-      } else {
-        navigate(userDoc.role === 'teacher' ? '/teacher' : '/dashboard', { replace: true })
-      }
-    }
-  }, [authLoading, user, userDoc])
+    if (authLoading || !user) return
+    // Not on the roster: App routes this to the explanation screen, so leaving
+    // Login without a profile is correct rather than a stuck state.
+    if (rejection) { navigate('/dashboard', { replace: true }); return }
+    if (!profile) return
+    if (needsSetup && profile.role !== 'admin') { navigate('/setup', { replace: true }); return }
+    navigate(homeFor(profile.role), { replace: true })
+  }, [authLoading, user, profile, rejection, needsSetup])
 
   async function handleGoogleSignIn() {
     setLoading(true)
     try {
       await signInWithGoogle()
-      // redirect handled by useEffect above
+      // redirect handled by the effect above
     } catch (err) {
       toast.error('Sign-in failed. Please try again.')
       console.error(err)

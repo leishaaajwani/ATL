@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:setup": "mysql -u atl -pdevpassword atl_nexus < db/migrations/001_init.sql && mysql -u atl -pdevpassword atl_nexus < db/seeds/001_reference.sql && mysql -u atl -pdevpassword atl_nexus < db/seeds/002_atl_subskills.sql",
+    "db:migrate": "node db/migrate-from-firestore.mjs",
+    "db:cleanup": "node db/cleanup-firestore.mjs",
+    "test": "node db/smoke-test.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

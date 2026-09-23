@@ -1,309 +1,313 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle, ArrowLeft } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
-import { createATLEntry, getUnitsForSubjectAndTeacher } from '../firebase/firestore'
+import { ArrowLeft, Check, Lock, CheckCircle2 } from 'lucide-react'
+import { getMyUnits, getMyReflection, submitReflection } from '../api/client'
+import { PageLoader } from '../components/ui/LoadingSpinner'
 import PageLayout from '../components/layout/PageLayout'
-import Button from '../components/ui/Button'
-import { Textarea } from '../components/ui/Input'
-import { CategoryBadge, LevelBadge } from '../components/ui/Badge'
-import { ATL_CATEGORIES, ASSESSMENT_LEVELS } from '../utils/atlFramework'
+import { ASSESSMENT_LEVELS } from '../utils/atlFramework'
 import toast from 'react-hot-toast'
 
-const MIN_WORDS = 100
+// Two stages, in this order, because that is the rule the teachers set:
+//   1. Tick the sub-skills you actually demonstrated, each with evidence
+//   2. Only once you are at the threshold do the reflection prompts unlock
+// The server enforces the same rule, so the lock is real rather than cosmetic.
 
-function countWords(text) {
-  return text.trim().split(/\s+/).filter(Boolean).length
-}
+const countWords = t => String(t ?? '').trim().split(/\s+/).filter(Boolean).length
 
 export default function ReflectionEntry() {
-  const { user, userDoc } = useAuth()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [params] = useSearchParams()
 
-  const [subject, setSubject]       = useState(searchParams.get('subject') ?? '')
-  const [unitId, setUnitId]         = useState(searchParams.get('unitId') ?? '')
-  const [atlRatings, setAtlRatings] = useState({})   // { Thinking: 'Proficient', ... }
-  const [reflection, setReflection] = useState('')
-  const [errors, setErrors]         = useState({})
-  const [submitting, setSubmitting] = useState(false)
-  const [availableUnits, setAvailableUnits] = useState([])
-  const [loadingUnits, setLoadingUnits]     = useState(false)
+  const [units, setUnits]     = useState([])
+  const [unitId, setUnitId]   = useState(params.get('unitId') ?? '')
+  const [ticks, setTicks]     = useState({})   // subskillId -> {selfLevel, evidenceNote}
+  const [answers, setAnswers] = useState({})   // promptId -> text
+  const [prompts, setPrompts] = useState([])
+  const [existing, setExisting] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving]   = useState(false)
 
-  const selectedUnit = availableUnits.find(u => u.id === unitId)
+  const unit = units.find(u => String(u.id) === String(unitId))
 
-  // Fetch units when subject changes
   useEffect(() => {
-    if (!subject) { setAvailableUnits([]); setUnitId(''); return }
-    const enrolled = (userDoc?.subjects ?? []).find(s => s.name === subject)
-    if (!enrolled?.teacher) { setAvailableUnits([]); return }
-    setLoadingUnits(true)
-    getUnitsForSubjectAndTeacher(subject, enrolled.teacher)
-      .then(units => {
-        const order = { 'Term 1': 0, 'Term 2': 1, 'Term 3': 2 }
-        setAvailableUnits(units.sort((a, b) =>
-          (order[a.term] ?? 9) - (order[b.term] ?? 9) || a.unitName.localeCompare(b.unitName),
-        ))
+    getMyUnits()
+      .then(r => {
+        setUnits(r.units)
+        if (!unitId && r.units.length === 1) setUnitId(String(r.units[0].id))
       })
-      .catch(() => setAvailableUnits([]))
-      .finally(() => setLoadingUnits(false))
-  }, [subject, userDoc])
+      .catch(err => toast.error(err.message))
+      .finally(() => setLoading(false))
+  }, [])
 
-  // Reset ATL ratings when unit changes
+  // Prompts come back with the existing reflection; fetch them per unit.
   useEffect(() => {
-    if (selectedUnit) {
-      setAtlRatings(Object.fromEntries(selectedUnit.atlSkills.map(s => [s, null])))
-    } else {
-      setAtlRatings({})
-    }
-    setErrors({})
+    if (!unitId) { setTicks({}); setAnswers({}); setExisting(null); return }
+    getMyReflection(unitId)
+      .then(r => {
+        setExisting(r.reflection)
+        if (r.reflection) {
+          setTicks(Object.fromEntries(r.reflection.ticks.map(t =>
+            [t.subskillId, { selfLevel: t.selfLevel, evidenceNote: t.evidenceNote }])))
+          setAnswers(Object.fromEntries(r.reflection.answers.map(a => [a.promptId, a.answerText])))
+        } else {
+          setTicks({}); setAnswers({})
+        }
+      })
+      .catch(() => {})
   }, [unitId])
 
-  function handleUnitChange(e) {
-    setUnitId(e.target.value)
+  // The prompt list is fixed school-wide, so read it off any loaded reflection,
+  // and fall back to the canonical three when there is no reflection yet.
+  useEffect(() => {
+    setPrompts(DEFAULT_PROMPTS)
+  }, [])
+
+  const tickedIds = useMemo(
+    () => Object.keys(ticks).filter(id => ticks[id]?.selfLevel && ticks[id]?.evidenceNote?.trim().length >= 10),
+    [ticks],
+  )
+  const threshold  = unit?.minSubskills ?? 3
+  const unlocked   = tickedIds.length >= threshold
+  const locked     = existing?.status === 'approved' || existing?.status === 'pending'
+
+  function setTick(id, patch) {
+    setTicks(prev => ({ ...prev, [id]: { ...(prev[id] ?? {}), ...patch } }))
+  }
+  function clearTick(id) {
+    setTicks(prev => { const next = { ...prev }; delete next[id]; return next })
   }
 
-  function rateSkill(skill, level) {
-    setAtlRatings(prev => ({ ...prev, [skill]: level }))
-    setErrors(prev => ({ ...prev, atlRatings: '' }))
-  }
-
-  function validate() {
-    const e = {}
-    if (!subject)  e.subject = 'Select a subject'
-    if (!unitId)   e.unitId  = 'Select a unit'
-    if (selectedUnit) {
-      const unrated = selectedUnit.atlSkills.filter(s => !atlRatings[s])
-      if (unrated.length) e.atlRatings = `Please rate: ${unrated.join(', ')}`
-    }
-    const wc = countWords(reflection)
-    if (wc < MIN_WORDS) e.reflection = `Reflection needs at least ${MIN_WORDS} words (${wc}/${MIN_WORDS})`
-    return e
-  }
-
-  async function handleSubmit(e) {
+  async function submit(e) {
     e.preventDefault()
-    const errs = validate()
-    if (Object.keys(errs).length) { setErrors(errs); return }
+    if (!unlocked) return toast.error(`Tick at least ${threshold} sub-skills first`)
 
-    setSubmitting(true)
-    // One entry per ATL skill — same reflection, same unit, grouped by submissionId
-    const submissionId = `${user.uid}_${Date.now()}`
+    for (const p of prompts) {
+      const w = countWords(answers[p.id])
+      if (w < p.minWords) return toast.error(`"${p.question}" needs ${p.minWords} words, you have ${w}`)
+    }
+
+    setSaving(true)
     try {
-      const skills = selectedUnit.atlSkills.filter(s => atlRatings[s])
-      await Promise.all(skills.map(atlCategory =>
-        createATLEntry({
-          studentId:        user.uid,
-          studentName:      userDoc?.displayName ?? '',
-          subject,
-          unitId,
-          unitName:         selectedUnit.unitName,
-          term:             selectedUnit.term,
-          atlCategory,
-          selfAssessment:   atlRatings[atlCategory],
-          substrand:        '',
-          reflection:       reflection.trim(),
-          unitSubmissionId: submissionId,
-        }),
-      ))
-      toast.success('Reflection submitted for teacher review!')
+      await submitReflection({
+        unitId: Number(unitId),
+        ticks: tickedIds.map(id => ({
+          subskillId: Number(id),
+          selfLevel: ticks[id].selfLevel,
+          evidenceNote: ticks[id].evidenceNote,
+        })),
+        answers: prompts.map(p => ({ promptId: p.id, answerText: answers[p.id] ?? '' })),
+      })
+      toast.success(existing?.status === 'returned' ? 'Revision sent for review' : 'Sent for review')
       navigate('/dashboard')
     } catch (err) {
-      toast.error('Failed to submit. Please try again.')
-      console.error(err)
+      toast.error(err.message)
     } finally {
-      setSubmitting(false)
+      setSaving(false)
     }
   }
 
-  const wordCount  = countWords(reflection)
-  const wordsDone  = wordCount >= MIN_WORDS
-  const wordsOver  = wordCount > MIN_WORDS * 3   // soft upper limit feel
-  const allRated   = selectedUnit?.atlSkills.every(s => atlRatings[s]) ?? false
+  if (loading) return <PageLoader />
 
   return (
     <PageLayout>
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(-1)} className="btn-ghost p-2">
-            <ArrowLeft size={16} />
-          </button>
+          <button onClick={() => navigate(-1)} className="btn-ghost p-2"><ArrowLeft size={16} /></button>
           <div>
-            <h1 className="page-title">New ATL Reflection</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Rate your ATL skills and reflect on the unit</p>
+            <h1 className="page-title">ATL Reflection</h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Tick what you demonstrated, then reflect on it
+            </p>
           </div>
         </div>
 
-        <motion.form onSubmit={handleSubmit} className="space-y-5"
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+        {/* Returned feedback sits above everything, because it is the reason
+            the student is back on this page. */}
+        {existing?.status === 'returned' && existing.teacherFeedback && (
+          <div className="card p-4 mb-5 border-gold-200 bg-gold-50">
+            <p className="text-xs font-semibold text-gold-800 uppercase tracking-wide mb-1">
+              Returned for revision
+            </p>
+            <p className="text-sm text-navy-900 leading-relaxed">{existing.teacherFeedback}</p>
+          </div>
+        )}
 
-          {/* Subject + Unit */}
-          <div className="card p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-700">Entry Details</h3>
-            <div className="grid sm:grid-cols-2 gap-4">
+        {locked && (
+          <div className="card p-4 mb-5 border-emerald-100 bg-emerald-50">
+            <p className="text-sm text-emerald-800">
+              This reflection is {existing.status}. You cannot change it now.
+            </p>
+          </div>
+        )}
 
-              {/* Subject */}
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1.5">Subject</label>
-                <select
-                  className={`input-base w-full ${errors.subject ? 'border-red-300' : ''}`}
-                  value={subject}
-                  onChange={e => { setSubject(e.target.value); setUnitId('') }}
-                >
-                  <option value="">Select subject…</option>
-                  {(userDoc?.subjects ?? []).map(s => (
-                    <option key={s.name} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
-                {errors.subject && <p className="text-xs text-red-500 mt-1">{errors.subject}</p>}
-              </div>
-
-              {/* Unit */}
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1.5">Unit</label>
-                <select
-                  className={`input-base w-full ${errors.unitId ? 'border-red-300' : ''}`}
-                  value={unitId}
-                  onChange={handleUnitChange}
-                  disabled={!subject || loadingUnits}
-                >
-                  <option value="">
-                    {!subject ? 'Select subject first' : loadingUnits ? 'Loading…'
-                      : availableUnits.length === 0 ? 'No units yet' : 'Select unit…'}
-                  </option>
-                  {availableUnits.map(u => (
-                    <option key={u.id} value={u.id}>{u.term} — {u.unitName}</option>
-                  ))}
-                </select>
-                {errors.unitId && <p className="text-xs text-red-500 mt-1">{errors.unitId}</p>}
-              </div>
-            </div>
+        <form onSubmit={submit} className="space-y-5">
+          <div className="card p-5">
+            <label className="text-xs font-medium text-slate-600 block mb-1.5">Unit</label>
+            <select className="input-base" value={unitId} disabled={locked}
+              onChange={e => setUnitId(e.target.value)}>
+              <option value="">Select a unit</option>
+              {units.map(u => (
+                <option key={u.id} value={u.id}>
+                  {u.subjectName} · {u.term} · {u.name}
+                  {u.reflectionStatus ? ` (${u.reflectionStatus})` : ''}
+                </option>
+              ))}
+            </select>
+            {units.length === 0 && (
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                No units yet. Your teachers create these, and they appear here once
+                your class enrolment is confirmed.
+              </p>
+            )}
           </div>
 
-          {/* ATL Skill Ratings — one row per skill */}
           <AnimatePresence>
-            {selectedUnit && (
-              <motion.div className="card p-5 space-y-4"
-                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-700">Rate Your ATL Skills</h3>
-                  <span className="text-[10px] text-slate-400">for {selectedUnit.unitName}</span>
+            {unit && (
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                className="card p-5">
+                <div className="flex items-baseline justify-between mb-1">
+                  <h2 className="text-sm font-semibold text-slate-800">
+                    Which of these did you actually do?
+                  </h2>
+                  <span className={`text-xs font-semibold ${unlocked ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {tickedIds.length} / {threshold}
+                  </span>
                 </div>
+                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                  Tick only the ones you can point to real evidence for. You need
+                  at least {threshold} before the reflection unlocks.
+                </p>
 
-                <div className="space-y-3">
-                  {selectedUnit.atlSkills.map(skill => {
-                    const { color, bg } = ATL_CATEGORIES[skill]
-                    const current = atlRatings[skill]
-                    return (
-                      <div key={skill} className="flex items-center gap-3">
-                        {/* Skill label */}
-                        <span className="text-xs font-semibold w-28 flex-shrink-0" style={{ color }}>
-                          {skill}
-                        </span>
-                        {/* Level buttons */}
-                        <div className="flex gap-1.5 flex-1">
-                          {ASSESSMENT_LEVELS.map(({ value, color: lc, bg: lb, label }) => (
-                            <button
-                              key={value}
-                              type="button"
-                              onClick={() => rateSkill(skill, value)}
-                              className={`flex-1 py-2 rounded-xl text-[11px] font-bold border-2 transition-all ${
-                                current === value
-                                  ? 'scale-105 shadow-sm'
-                                  : 'border-slate-100 text-slate-400 hover:border-slate-200'
-                              }`}
-                              style={current === value ? { backgroundColor: lb, borderColor: lc, color: lc } : {}}
-                            >
-                              {value[0]}
-                            </button>
-                          ))}
-                        </div>
-                        {/* Current label */}
-                        <span className="text-xs w-20 text-right flex-shrink-0">
-                          {current
-                            ? <span className="font-semibold" style={{ color }}>{current}</span>
-                            : <span className="text-slate-300 italic">not rated</span>
-                          }
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {errors.atlRatings && (
-                  <p className="text-xs text-red-500">{errors.atlRatings}</p>
-                )}
-
-                {/* Legend */}
-                <div className="flex gap-3 pt-1 border-t border-slate-50">
-                  {ASSESSMENT_LEVELS.map(({ value, color, label }) => (
-                    <span key={value} className="text-[10px] text-slate-400">
-                      <span className="font-bold" style={{ color }}>{value[0]}</span> = {value}
-                    </span>
+                <div className="space-y-2.5">
+                  {unit.subskills?.map(ss => (
+                    <SubskillRow
+                      key={ss.id}
+                      subskill={ss}
+                      value={ticks[ss.id]}
+                      disabled={locked}
+                      onToggle={() => ticks[ss.id] ? clearTick(ss.id) : setTick(ss.id, { selfLevel: 'Developing', evidenceNote: '' })}
+                      onChange={patch => setTick(ss.id, patch)}
+                    />
                   ))}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Reflection */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-700">Unit Reflection</h3>
-              <span className={`text-xs font-medium transition-colors ${
-                wordsDone ? 'text-green-500' : 'text-slate-400'
-              }`}>
-                {wordCount} / {MIN_WORDS} words
-              </span>
-            </div>
-            <textarea
-              className={`input-base w-full resize-none ${errors.reflection ? 'border-red-300' : ''}`}
-              rows={7}
-              value={reflection}
-              onChange={e => { setReflection(e.target.value); setErrors(p => ({ ...p, reflection: '' })) }}
-              placeholder="Reflect on how you demonstrated the ATL skills above during this unit. Be specific — describe a situation, what you did, and what you learned. (minimum 100 words)"
-            />
-            {/* Word count bar */}
-            <div className="flex items-center gap-2 mt-2">
-              <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${
-                    wordsDone ? 'bg-green-400' : 'bg-slate-300'
-                  }`}
-                  style={{ width: `${Math.min((wordCount / MIN_WORDS) * 100, 100)}%` }}
-                />
+          {/* Prompts, gated */}
+          {unit && (
+            <div className={`card p-5 transition-opacity ${unlocked ? '' : 'opacity-60'}`}>
+              <div className="flex items-center gap-2 mb-4">
+                {unlocked
+                  ? <CheckCircle2 size={15} className="text-emerald-500" />
+                  : <Lock size={15} className="text-slate-400" />}
+                <h2 className="text-sm font-semibold text-slate-800">Your reflection</h2>
               </div>
-              {wordsDone && <CheckCircle size={12} className="text-green-500 flex-shrink-0" />}
-            </div>
-            {errors.reflection && <p className="text-xs text-red-500 mt-1">{errors.reflection}</p>}
-          </div>
 
-          {/* Preview */}
-          {subject && unitId && allRated && wordsDone && (
-            <motion.div className="card p-4 border-navy-100 bg-navy-50"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <p className="text-xs text-navy-600 font-medium mb-2">Ready to submit</p>
-              <div className="flex flex-wrap gap-2">
-                <span className="badge bg-white text-slate-700 border border-slate-200">{subject}</span>
-                <span className="badge bg-white text-slate-700 border border-slate-200">{selectedUnit?.unitName}</span>
-                {selectedUnit?.atlSkills.map(s => (
-                  <span key={s} className="badge bg-white text-slate-700 border border-slate-200">
-                    {s}: {atlRatings[s]?.[0]}
-                  </span>
-                ))}
-              </div>
-            </motion.div>
+              {!unlocked ? (
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Tick {threshold - tickedIds.length} more sub-skill
+                  {threshold - tickedIds.length === 1 ? '' : 's'} to unlock these questions.
+                </p>
+              ) : (
+                <div className="space-y-5">
+                  {prompts.map(p => {
+                    const words = countWords(answers[p.id])
+                    const done  = words >= p.minWords
+                    return (
+                      <div key={p.id}>
+                        <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                          <label className="text-sm font-medium text-slate-800 leading-snug">
+                            {p.question}
+                          </label>
+                          <span className={`text-xs shrink-0 font-medium ${done ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            {words}/{p.minWords}
+                          </span>
+                        </div>
+                        {p.helper && <p className="text-xs text-slate-500 mb-2">{p.helper}</p>}
+                        <textarea
+                          className="input-base resize-none" rows={4} disabled={locked}
+                          value={answers[p.id] ?? ''}
+                          onChange={e => setAnswers(a => ({ ...a, [p.id]: e.target.value }))}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           )}
 
-          <div className="flex items-center justify-between pt-2">
-            <button type="button" onClick={() => navigate(-1)} className="btn-ghost">Cancel</button>
-            <Button type="submit" loading={submitting} icon={<CheckCircle size={15} />}>
-              Submit for Review
-            </Button>
-          </div>
-        </motion.form>
+          {unit && !locked && (
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-ghost" onClick={() => navigate(-1)}>Cancel</button>
+              <button className="btn-accent" disabled={saving || !unlocked}>
+                {saving ? 'Sending' : existing?.status === 'returned' ? 'Resubmit' : 'Send for review'}
+              </button>
+            </div>
+          )}
+        </form>
       </div>
     </PageLayout>
   )
 }
+
+function SubskillRow({ subskill, value, disabled, onToggle, onChange }) {
+  const on = Boolean(value)
+  return (
+    <div className={`rounded-xl border transition-colors ${on ? 'border-navy-200 bg-navy-50/40' : 'border-slate-100'}`}>
+      <button type="button" onClick={onToggle} disabled={disabled}
+        className="w-full flex items-start gap-3 p-3 text-left">
+        <span className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-colors
+          ${on ? 'bg-navy-700 border-navy-700' : 'border-slate-300 bg-white'}`}>
+          {on && <Check size={11} className="text-white" strokeWidth={3} />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="text-sm text-slate-800 leading-snug block">{subskill.name}</span>
+          <span className="text-[11px] mt-0.5 inline-block px-1.5 py-0.5 rounded"
+            style={{ backgroundColor: subskill.bgColour, color: subskill.colour }}>
+            {subskill.categoryName}
+          </span>
+        </span>
+      </button>
+
+      {on && (
+        <div className="px-3 pb-3 pl-10 space-y-2">
+          <div className="flex gap-1.5">
+            {ASSESSMENT_LEVELS.map(l => (
+              <button key={l.value} type="button" disabled={disabled}
+                onClick={() => onChange({ selfLevel: l.value })}
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-all
+                  ${value.selfLevel === l.value ? '' : 'border-slate-200 text-slate-400 hover:border-slate-300'}`}
+                style={value.selfLevel === l.value
+                  ? { backgroundColor: l.bg, borderColor: l.color, color: l.color } : {}}>
+                {l.value}
+              </button>
+            ))}
+          </div>
+          <input
+            className="input-base !py-2 !text-xs" disabled={disabled}
+            placeholder="Where did you do this? Name the task or lesson."
+            value={value.evidenceNote ?? ''}
+            onChange={e => onChange({ evidenceNote: e.target.value })}
+          />
+          {value.evidenceNote && value.evidenceNote.trim().length < 10 && (
+            <p className="text-[11px] text-gold-700">A bit more detail, at least a few words.</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Mirrors db/seeds/001_reference.sql. The server validates against its own copy,
+// so a mismatch here fails loudly rather than silently accepting a short answer.
+const DEFAULT_PROMPTS = [
+  { id: 1, minWords: 40, question: 'Which sub-skill did you rely on most in this unit, and where specifically did you use it?',
+    helper: 'Name the task, lesson or assessment. Be concrete rather than general.' },
+  { id: 2, minWords: 50, question: 'Describe one moment in this unit where this skill was difficult. What did you actually do about it?',
+    helper: 'Describe the difficulty and your response, not just the outcome.' },
+  { id: 3, minWords: 30, question: 'What will you do differently in the next unit?',
+    helper: 'One specific change you intend to make, not a general aspiration.' },
+]

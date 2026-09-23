@@ -1,8 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+
 import {
   LayoutDashboard, PenLine, BarChart3, CheckCircle,
-  BookOpen, LogOut, Users, ChevronRight, BookMarked, FileText,
+  BookOpen, LogOut, Users, BookMarked, FileText,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { signOut } from '../../firebase/auth'
@@ -24,10 +24,14 @@ const teacherNav = [
   { to: '/analytics',  label: 'Analytics',     icon: BarChart3 },
 ]
 
+const adminNav = [
+  { to: '/admin',      label: 'Roster',        icon: Users },
+]
+
 export default function Sidebar({ mobile, onClose }) {
-  const { userDoc, isTeacher } = useAuth()
+  const { profile, role } = useAuth()
   const navigate = useNavigate()
-  const navItems = isTeacher ? teacherNav : studentNav
+  const navItems = role === 'admin' ? adminNav : role === 'teacher' ? teacherNav : studentNav
 
   async function handleSignOut() {
     await signOut()
@@ -76,19 +80,16 @@ export default function Sidebar({ mobile, onClose }) {
       {/* User profile */}
       <div className="px-3 py-4 border-t border-slate-100">
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl">
-          {userDoc?.photoURL
-            ? <img src={userDoc.photoURL} alt="" className="w-8 h-8 rounded-full object-cover" />
-            : <div className="w-8 h-8 rounded-full bg-navy-100 flex items-center justify-center text-navy-700 text-xs font-semibold">
-                {(userDoc?.displayName ?? '?').charAt(0)}
-              </div>
-          }
+          <div className="w-8 h-8 rounded-full bg-navy-100 flex items-center justify-center text-navy-800 text-xs font-semibold">
+            {(profile?.fullName ?? '?').charAt(0)}
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-900 truncate">{userDoc?.displayName ?? 'User'}</p>
-            <p className="text-[11px] text-slate-400 capitalize">{userDoc?.role}</p>
+            <p className="text-sm font-medium text-slate-900 truncate">{profile?.fullName ?? 'User'}</p>
+            <p className="text-[11px] text-slate-500 capitalize">{profile?.role}</p>
           </div>
           <button
             onClick={handleSignOut}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
             title="Sign out"
           >
             <LogOut size={14} />

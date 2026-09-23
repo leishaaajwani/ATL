@@ -1,93 +1,65 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle, XCircle, MessageSquare, ChevronDown, Filter } from 'lucide-react'
-import { usePendingEntries, useAllEntries } from '../hooks/useATLEntries'
-import { approveEntry, rejectEntry, subscribeToStudents } from '../firebase/firestore'
-import { useAuth } from '../contexts/AuthContext'
-import { getMyStudents } from '../utils/helpers'
+import { CheckCircle2, RotateCcw, ChevronDown, Sparkles } from 'lucide-react'
+import { getReviewQueue, reviewReflection } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
-import Card, { CardHeader } from '../components/ui/Card'
-import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
-import { Textarea, Select } from '../components/ui/Input'
-import { LevelBadge, CategoryBadge, StatusBadge } from '../components/ui/Badge'
-import { ASSESSMENT_LEVELS, ATL_CATEGORIES } from '../utils/atlFramework'
-import { formatDateTime, truncate } from '../utils/helpers'
+import { PageLoader } from '../components/ui/LoadingSpinner'
+import { formatDateTime } from '../utils/helpers'
 import toast from 'react-hot-toast'
 
+// Every reflection now arrives with its sub-skill ticks and evidence notes, so
+// the teacher can see what the student claims they did before reading the prose.
+
 export default function ApprovalReview() {
-  const { userDoc } = useAuth()
-  const { entries: allPending, loading } = usePendingEntries()
-  const { entries: allEntries } = useAllEntries()
-  const [filter, setFilter] = useState('pending')
-  const [allStudents, setAllStudents] = useState([])
+  const [tab, setTab]       = useState('pending')
+  const [items, setItems]   = useState([])
+  const [loading, setLoad]  = useState(true)
 
-  useEffect(() => {
-    const unsub = subscribeToStudents(setAllStudents)
-    return unsub
-  }, [])
-
-  const myStudentIds = new Set(
-    getMyStudents(userDoc?.displayName, userDoc?.teachingGroups, allStudents).map(s => s.id),
-  )
-
-  // If no students yet (still loading), show all; once loaded, filter
-  const filterFn = e => myStudentIds.size === 0 || myStudentIds.has(e.studentId)
-
-  const pending  = allPending.filter(filterFn)
-  const reviewed = allEntries.filter(e => e.approvalStatus !== 'pending' && filterFn(e))
-  const displayed = filter === 'pending' ? pending : reviewed
+  async function load() {
+    setLoad(true)
+    try { setItems((await getReviewQueue(tab)).reflections) }
+    catch (err) { toast.error(err.message) }
+    finally { setLoad(false) }
+  }
+  useEffect(() => { load() }, [tab])
 
   return (
     <PageLayout>
       <div className="space-y-5">
         <div>
-          <h1 className="page-title">Approval Management</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Review, approve, and provide feedback on student reflections</p>
+          <h1 className="page-title">Approvals</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Review what students claim they demonstrated, then approve or send it back
+          </p>
         </div>
 
-        {/* Toggle */}
         <div className="flex gap-2">
-          {['pending', 'reviewed'].map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
+          {[['pending', 'Awaiting review'], ['returned', 'Returned'], ['approved', 'Approved']].map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                filter === f ? 'bg-navy-700 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
-              }`}
-            >
-              {f === 'pending' ? `Pending (${pending.length})` : `Reviewed (${reviewed.length})`}
+                tab === k ? 'bg-navy-900 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+              }`}>
+              {label}
             </button>
           ))}
         </div>
 
-        {/* Entries */}
-        {loading ? (
-          <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 bg-slate-100 rounded-2xl animate-pulse" />
-            ))}
-          </div>
-        ) : displayed.length === 0 ? (
+        {loading ? <PageLoader /> : items.length === 0 ? (
           <div className="card p-12 text-center">
-            <CheckCircle size={32} className="text-green-400 mx-auto mb-3" />
-            <p className="text-sm font-medium text-slate-700">
-              {filter === 'pending' ? 'No pending entries — all caught up!' : 'No reviewed entries yet.'}
+            <CheckCircle2 size={28} className="text-emerald-500 mx-auto mb-3" />
+            <p className="text-sm font-medium text-slate-800">
+              {tab === 'pending' ? 'Nothing waiting on you' : `No ${tab} reflections`}
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <AnimatePresence initial={false}>
-              {displayed.map((entry, i) => (
-                <motion.div
-                  key={entry.id}
-                  layout
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20, height: 0 }}
-                  transition={{ delay: i * 0.04 }}
-                >
-                  <EntryCard entry={entry} />
+              {items.map(r => (
+                <motion.div key={r.id} layout
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -20 }}>
+                  <ReflectionCard reflection={r} onDone={load} />
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -98,117 +70,115 @@ export default function ApprovalReview() {
   )
 }
 
-function EntryCard({ entry }) {
-  const [modalOpen, setModalOpen] = useState(false)
-  const [action, setAction] = useState(null) // 'approve' | 'reject'
-  const [feedback, setFeedback] = useState('')
-  const [overrideLevel, setOverrideLevel] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+function ReflectionCard({ reflection: r, onDone }) {
+  const [open, setOpen]     = useState(false)
+  const [modal, setModal]   = useState(null)   // 'approve' | 'return'
+  const [feedback, setFb]   = useState('')
+  const [busy, setBusy]     = useState(false)
 
-  const isPending = entry.approvalStatus === 'pending'
-  const catStyle = ATL_CATEGORIES[entry.atlCategory] ?? { color: '#64748b', bg: '#f8fafc' }
-
-  function openModal(type) {
-    setAction(type)
-    setFeedback('')
-    setOverrideLevel('')
-    setModalOpen(true)
-  }
-
-  async function handleSubmit() {
-    setSubmitting(true)
+  async function submit() {
+    setBusy(true)
     try {
-      const scoreOverride = overrideLevel ? ASSESSMENT_LEVELS.find(l => l.value === overrideLevel)?.score : null
-      if (action === 'approve') {
-        await approveEntry(entry.id, feedback, scoreOverride)
-        toast.success('Entry approved')
-      } else {
-        await rejectEntry(entry.id, feedback)
-        toast.success('Entry returned to student')
-      }
-      setModalOpen(false)
+      await reviewReflection(r.id, modal, feedback)
+      toast.success(modal === 'approve' ? 'Approved' : 'Sent back to the student')
+      setModal(null)
+      await onDone()
     } catch (err) {
-      toast.error('Action failed. Please try again.')
+      toast.error(err.message)
     } finally {
-      setSubmitting(false)
+      setBusy(false)
     }
   }
 
   return (
     <>
       <div className="card overflow-hidden">
-        {/* Card header */}
-        <div
-          className="flex items-start gap-4 p-5 cursor-pointer"
-          onClick={() => setExpanded(e => !e)}
-        >
-          <div
-            className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center"
-            style={{ backgroundColor: catStyle.bg }}
-          >
-            <span className="text-base font-semibold" style={{ color: catStyle.color }}>
-              {entry.atlCategory?.[0]}
-            </span>
+        <button onClick={() => setOpen(o => !o)} className="w-full text-left p-5 flex items-start gap-4">
+          <div className="w-9 h-9 rounded-xl bg-navy-100 flex items-center justify-center shrink-0 text-navy-800 text-sm font-semibold">
+            {r.studentName?.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className="font-semibold text-slate-900">{entry.studentName}</span>
-              <span className="text-slate-400 text-sm">·</span>
-              <span className="text-sm text-slate-600">{entry.subject}</span>
-              <CategoryBadge category={entry.atlCategory} />
-              <StatusBadge status={entry.approvalStatus} />
+              <span className="font-semibold text-slate-900">{r.studentName}</span>
+              <span className="text-slate-300">·</span>
+              <span className="text-sm text-slate-600">{r.subjectName}</span>
+              {r.revisionCount > 0 && (
+                <span className="badge bg-gold-100 text-gold-800">
+                  Revision {r.revisionCount}
+                </span>
+              )}
             </div>
-            <p className="text-xs text-slate-400">{entry.substrand} · {entry.term} of Term · {formatDateTime(entry.createdAt)}</p>
-            <p className="text-sm text-slate-700 mt-1.5 leading-relaxed">
-              {expanded ? entry.reflection : truncate(entry.reflection, 120)}
+            <p className="text-xs text-slate-500">
+              {r.term} · {r.name ?? r.unitName} · {formatDateTime(r.submittedAt)}
             </p>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {r.ticks?.map(t => (
+                <span key={t.subskillId} className="text-[10px] px-1.5 py-0.5 rounded"
+                  style={{ backgroundColor: t.bgColour, color: t.colour }}>
+                  {t.subskillName} · {t.selfLevel}
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <LevelBadge level={entry.selfAssessment} />
-            <ChevronDown
-              size={14}
-              className={`text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-            />
-          </div>
-        </div>
+          <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
 
-        {/* Expanded section */}
         <AnimatePresence>
-          {expanded && (
-            <motion.div
-              initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="px-5 pb-5 space-y-4 border-t border-slate-100 pt-4">
-                {/* Full reflection */}
+          {open && (
+            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
+              className="overflow-hidden">
+              <div className="px-5 pb-5 pt-4 border-t border-slate-100 space-y-5">
+
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1.5">Full Reflection</p>
-                  <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-xl">{entry.reflection}</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                    Claimed sub-skills and evidence
+                  </p>
+                  <div className="space-y-2">
+                    {r.ticks?.map(t => (
+                      <div key={t.subskillId} className="rounded-xl bg-slate-50 p-3">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="text-xs font-medium text-slate-800">
+                            {t.subskillName}
+                            {t.isSubjectSpecific && <Sparkles size={9} className="inline ml-1 -mt-0.5 text-gold-600" />}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: t.bgColour, color: t.colour }}>
+                            {t.selfLevel}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed">{t.evidenceNote}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Existing feedback */}
-                {entry.teacherFeedback && (
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 mb-1.5">Teacher Feedback</p>
-                    <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl">{entry.teacherFeedback}</p>
-                    {entry.teacherScore && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        Score: <span className="font-medium text-slate-700">{entry.teacherScore}/4</span>
+                <div className="space-y-3">
+                  {r.answers?.map(a => (
+                    <div key={a.sequence}>
+                      <p className="text-xs font-medium text-slate-700 mb-1">{a.question}</p>
+                      <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-xl">
+                        {a.answerText}
                       </p>
-                    )}
+                      <p className="text-[10px] text-slate-400 mt-1">{a.wordCount} words</p>
+                    </div>
+                  ))}
+                </div>
+
+                {r.teacherFeedback && (
+                  <div className="rounded-xl bg-navy-50 p-3">
+                    <p className="text-xs font-semibold text-navy-800 mb-1">Your previous feedback</p>
+                    <p className="text-sm text-navy-900 leading-relaxed">{r.teacherFeedback}</p>
                   </div>
                 )}
 
-                {/* Action buttons */}
-                {isPending && (
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="danger" size="sm" icon={<XCircle size={13} />} onClick={() => openModal('reject')}>
-                      Return to Student
-                    </Button>
-                    <Button variant="primary" size="sm" icon={<CheckCircle size={13} />} onClick={() => openModal('approve')}>
-                      Approve
-                    </Button>
+                {r.status === 'pending' && (
+                  <div className="flex gap-2 justify-end pt-1">
+                    <button className="btn-secondary" onClick={() => { setModal('return'); setFb('') }}>
+                      <RotateCcw size={13} /> Send back
+                    </button>
+                    <button className="btn-accent" onClick={() => { setModal('approve'); setFb('') }}>
+                      <CheckCircle2 size={13} /> Approve
+                    </button>
                   </div>
                 )}
               </div>
@@ -217,58 +187,25 @@ function EntryCard({ entry }) {
         </AnimatePresence>
       </div>
 
-      {/* Review modal */}
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={action === 'approve' ? 'Approve Entry' : 'Return to Student'}
-      >
+      <Modal open={Boolean(modal)} onClose={() => setModal(null)}
+        title={modal === 'approve' ? 'Approve reflection' : 'Send back for revision'}>
         <div className="space-y-4">
-          {/* Entry summary */}
-          <div className="p-3 bg-slate-50 rounded-xl">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-sm font-medium">{entry.studentName}</span>
-              <CategoryBadge category={entry.atlCategory} />
-              <LevelBadge level={entry.selfAssessment} />
-            </div>
-            <p className="text-xs text-slate-500">{truncate(entry.reflection, 100)}</p>
-          </div>
-
-          <Textarea
-            label={action === 'approve' ? 'Feedback (optional)' : 'Feedback for student (required)'}
-            value={feedback}
-            onChange={e => setFeedback(e.target.value)}
-            rows={4}
-            placeholder={
-              action === 'approve'
-                ? 'Add encouraging feedback or notes for the student…'
-                : 'Explain what the student should improve or clarify before resubmitting…'
-            }
-          />
-
-          {action === 'approve' && (
-            <Select
-              label="Override assessment level (optional)"
-              value={overrideLevel}
-              onChange={e => setOverrideLevel(e.target.value)}
-            >
-              <option value="">Keep student self-assessment ({entry.selfAssessment})</option>
-              {ASSESSMENT_LEVELS.map(l => (
-                <option key={l.value} value={l.value}>{l.value} ({l.score}/4)</option>
-              ))}
-            </Select>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button
-              variant={action === 'approve' ? 'primary' : 'danger'}
-              loading={submitting}
-              onClick={handleSubmit}
-              disabled={action === 'reject' && !feedback.trim()}
-            >
-              {action === 'approve' ? 'Approve Entry' : 'Return to Student'}
-            </Button>
+          <p className="text-sm text-slate-600">
+            {modal === 'approve'
+              ? `Approving ${r.studentName}'s reflection on ${r.unitName}.`
+              : `${r.studentName} will see your comment and can revise this same reflection. It stays attached to ${r.unitName}, so a different entry will not satisfy it.`}
+          </p>
+          <textarea className="input-base resize-none" rows={4} value={feedback}
+            onChange={e => setFb(e.target.value)}
+            placeholder={modal === 'approve'
+              ? 'Optional comment for the student'
+              : 'What should they change? This is required.'} />
+          <div className="flex justify-end gap-2">
+            <button className="btn-ghost" onClick={() => setModal(null)}>Cancel</button>
+            <button className="btn-accent" disabled={busy || (modal === 'return' && !feedback.trim())}
+              onClick={submit}>
+              {busy ? 'Saving' : modal === 'approve' ? 'Approve' : 'Send back'}
+            </button>
           </div>
         </div>
       </Modal>

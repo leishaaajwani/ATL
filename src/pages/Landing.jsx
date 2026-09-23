@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BookOpen, BarChart3, CheckCircle, PenLine, ArrowRight, Sparkles } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth, homeFor } from '../contexts/AuthContext'
 import { useEffect } from 'react'
 
 const features = [
@@ -30,14 +30,14 @@ const features = [
 const fade = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }
 
 export default function Landing() {
-  const { user, userDoc, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!loading && user && userDoc) {
-      navigate(userDoc.role === 'teacher' ? '/teacher' : '/dashboard')
+    if (!loading && user && profile) {
+      navigate(homeFor(profile.role))
     }
-  }, [loading, user, userDoc])
+  }, [loading, user, profile])
 
   return (
     <div className="min-h-screen bg-white">

@@ -53,7 +53,14 @@ const patch = (p, body)    => request(p, { method: 'PATCH', body })
 
 export const getMe = () => get('/me')
 
-// ── ATL framework ───────────────────────────────────────────────────────────
+// ── Reference data ──────────────────────────────────────────────────────────
+
+// The subject catalogue is static per session, so hold it after the first read.
+let subjectsCache = null
+export async function getSubjects() {
+  if (!subjectsCache) subjectsCache = (await get('/subjects')).subjects
+  return subjectsCache
+}
 
 export const getSubskills   = subjectId => get('/subskills', { subjectId })
 export const createSubskill = payload   => post('/subskills', payload)

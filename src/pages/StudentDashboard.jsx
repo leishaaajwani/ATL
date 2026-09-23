@@ -1,317 +1,207 @@
-import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PenLine, Clock, CheckCircle, XCircle, TrendingUp, BookOpen, AlertCircle } from 'lucide-react'
+import { PenLine, Clock, CheckCircle2, AlertCircle, BookOpen } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { useStudentEntries } from '../hooks/useATLEntries'
-import { useAnalytics } from '../hooks/useAnalytics'
-import { subscribeToStudentUnitRatings } from '../firebase/firestore'
+import { getMyUnits, getRatings } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
 import Card, { CardHeader } from '../components/ui/Card'
-import Button from '../components/ui/Button'
-import { LevelBadge, CategoryBadge, StatusBadge } from '../components/ui/Badge'
-import ChartContainer from '../components/charts/ChartContainer'
-import { ATL_CATEGORIES, ATL_CATEGORY_KEYS, SCORE_MAP, SCORE_LABEL } from '../utils/atlFramework'
-import { formatDate, truncate } from '../utils/helpers'
+import { PageLoader } from '../components/ui/LoadingSpinner'
+import { SCORE_MAP, SCORE_LABEL } from '../utils/atlFramework'
+import toast from 'react-hot-toast'
 
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-}
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
 
 export default function StudentDashboard() {
-  const { user, userDoc } = useAuth()
-  const navigate = useNavigate()
-  const { entries, loading } = useStudentEntries(userDoc?.uid)
-  const analytics = useAnalytics(entries)
-  const [unitRatings, setUnitRatings] = useState([])
+  const { profile } = useAuth()
+  const [units, setUnits]     = useState([])
+  const [ratings, setRatings] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!user?.uid) return
-    const unsub = subscribeToStudentUnitRatings(user.uid, setUnitRatings)
-    return unsub
-  }, [user])
+    Promise.all([getMyUnits(), getRatings({}).catch(() => ({ ratings: [] }))])
+      .then(([u, r]) => { setUnits(u.units); setRatings(r.ratings ?? []) })
+      .catch(err => toast.error(err.message))
+      .finally(() => setLoading(false))
+  }, [])
 
-  const recentEntries   = entries.slice(0, 5)
-  // De-dupe rejected entries by unitSubmissionId so one unit form shows once
-  const rejectedRaw = entries.filter(e => e.approvalStatus === 'rejected')
-  const rejectedEntries = rejectedRaw.filter((e, _, arr) =>
-    !e.unitSubmissionId || arr.findIndex(x => x.unitSubmissionId === e.unitSubmissionId) === arr.indexOf(e),
-  )
+  const stats = useMemo(() => ({
+    total:     units.length,
+    done:      units.filter(u => u.reflectionStatus === 'approved').length,
+    pending:   units.filter(u => u.reflectionStatus === 'pending').length,
+    returned:  units.filter(u => u.reflectionStatus === 'returned').length,
+    todo:      units.filter(u => !u.reflectionStatus && u.isOpen).length,
+  }), [units])
+
+  const returned = units.filter(u => u.reflectionStatus === 'returned')
+
+  if (loading) return <PageLoader />
 
   return (
     <PageLayout>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-        {/* Header */}
-        <motion.div variants={item} className="flex items-center justify-between">
+        <motion.div variants={item} className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="page-title">
-              Good {timeGreeting()}, {userDoc?.displayName?.split(' ')[0] ?? 'there'}
+              Good {timeGreeting()}, {profile?.fullName?.split(' ')[0] ?? 'there'}
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">Track your ATL growth across all subjects</p>
+            <p className="text-sm text-slate-500 mt-0.5">Your ATL skills across every unit</p>
           </div>
-          <Link to="/reflect">
-            <Button icon={<PenLine size={15} />}>New Entry</Button>
-          </Link>
+          <Link to="/reflect"><button className="btn-accent"><PenLine size={15} /> New reflection</button></Link>
         </motion.div>
 
-        {/* Returned entries alert */}
-        {rejectedEntries.length > 0 && (
-          <motion.div variants={item} className="card p-4 border-rose-100 bg-rose-50">
+        {/* Returned work goes first, because it is the only thing that is blocked */}
+        {returned.length > 0 && (
+          <motion.div variants={item} className="card p-4 border-gold-200 bg-gold-50">
             <div className="flex items-center gap-2 mb-3">
-              <AlertCircle size={15} className="text-rose-500" />
-              <p className="text-sm font-semibold text-rose-700">
-                {rejectedEntries.length} {rejectedEntries.length === 1 ? 'entry' : 'entries'} returned for revision
+              <AlertCircle size={15} className="text-gold-700" />
+              <p className="text-sm font-semibold text-navy-900">
+                {returned.length} {returned.length === 1 ? 'reflection needs' : 'reflections need'} revision
               </p>
             </div>
             <div className="space-y-2">
-              {rejectedEntries.map(e => (
-                <div key={e.id} className="bg-white rounded-xl p-3 border border-rose-100">
-                  <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-slate-800">{e.subject}</span>
-                      {e.unitName && (
-                        <>
-                          <span className="text-slate-300">·</span>
-                          <span className="text-xs text-slate-500">{e.unitName}</span>
-                        </>
-                      )}
+              {returned.map(u => (
+                <div key={u.id} className="bg-white rounded-xl p-3 border border-gold-200/60">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900">{u.subjectName}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{u.term} · {u.name}</p>
                     </div>
-                    <button
-                      onClick={() => navigate(`/reflect?subject=${encodeURIComponent(e.subject)}&unitId=${encodeURIComponent(e.unitId ?? '')}`)}
-                      className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors"
-                    >
-                      Revise &amp; Resubmit
-                    </button>
+                    <Link to={`/reflect?unitId=${u.id}`}>
+                      <button className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-navy-900 text-white hover:bg-navy-800 transition-colors">
+                        Revise
+                      </button>
+                    </Link>
                   </div>
-                  {e.teacherFeedback && (
-                    <p className="text-xs text-rose-600 italic mt-1">
-                      Feedback: "{e.teacherFeedback}"
+                  {u.teacherFeedback && (
+                    <p className="text-xs text-slate-600 mt-2 pt-2 border-t border-slate-100 leading-relaxed">
+                      {u.teacherFeedback}
                     </p>
                   )}
                 </div>
               ))}
             </div>
-            <p className="text-xs text-rose-500 mt-2">
-              Address the feedback and resubmit — your teacher will review the new entry.
-            </p>
           </motion.div>
         )}
 
-        {/* Stats row */}
         <motion.div variants={item} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatCard label="Total Entries" value={entries.length} icon={BookOpen} color="blue" />
-          <StatCard label="Approved" value={analytics.totalApproved} icon={CheckCircle} color="green" />
-          <StatCard label="Pending" value={analytics.totalPending} icon={Clock} color="amber" />
-          <StatCard
-            label="Overall Score"
-            value={analytics.overallAverage > 0 ? analytics.overallAverage.toFixed(1) : '—'}
-            icon={TrendingUp}
-            color="purple"
-            sub="/ 4.0"
-          />
+          <Stat label="Units"     value={stats.total}   icon={BookOpen}    tone="navy" />
+          <Stat label="Approved"  value={stats.done}    icon={CheckCircle2} tone="green" />
+          <Stat label="Awaiting review" value={stats.pending} icon={Clock}  tone="gold" />
+          <Stat label="Still to do" value={stats.todo}  icon={PenLine}     tone="slate" />
         </motion.div>
 
-        {/* Chart + Subject cards */}
-        <div className="grid lg:grid-cols-3 gap-5">
-          <motion.div variants={item} className="lg:col-span-2">
-            <ChartContainer
-              radarData={analytics.radarData}
-              termData={analytics.termData}
-              categoryAverages={analytics.categoryAverages}
-              title="ATL Performance Overview"
-            />
-          </motion.div>
-
-          {/* Subject breakdown — only the student's enrolled subjects */}
-          <motion.div variants={item} className="space-y-3">
-            <h3 className="section-title px-0.5">My Subjects</h3>
-            {(userDoc?.subjects ?? []).length === 0 ? (
-              <p className="text-xs text-slate-400 px-0.5">No subjects enrolled yet.</p>
-            ) : (userDoc.subjects).map(sub => {
-              const subjectEntries = analytics.approvedEntries.filter(e => e.subject === sub.name)
-              const avg = subjectEntries.length
-                ? (subjectEntries.reduce((s, e) => s + (e.teacherScore ?? e.score), 0) / subjectEntries.length).toFixed(1)
-                : null
-
-              // Teacher's unit ratings for this subject
-              const subTeacherRatings = unitRatings.filter(r => r.subject === sub.name)
-              const teacherAtlMap = ATL_CATEGORY_KEYS.reduce((acc, cat) => {
-                const catR = subTeacherRatings.filter(r => r.atl === cat)
-                if (catR.length > 0) {
-                  const avgScore = catR.reduce((s, r) => s + (SCORE_MAP[r.level] ?? 0), 0) / catR.length
-                  acc[cat] = SCORE_LABEL[Math.round(avgScore)]
-                }
-                return acc
-              }, {})
-              const hasTeacherRating = Object.keys(teacherAtlMap).length > 0
-
-              return (
-                <div key={sub.name} className="card p-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-slate-800">{sub.name}</span>
-                    {avg
-                      ? <span className="text-sm font-semibold text-navy-700">{avg}<span className="text-slate-400 font-normal text-xs">/4</span></span>
-                      : <span className="text-xs text-slate-400">No data</span>
-                    }
-                  </div>
-                  <p className="text-[11px] text-slate-400 mb-2">{sub.teacher}</p>
-                  <div className="w-full bg-slate-100 rounded-full h-1.5">
-                    <div
-                      className="h-1.5 rounded-full bg-navy-600 transition-all duration-500"
-                      style={{ width: avg ? `${(avg / 4) * 100}%` : '0%' }}
-                    />
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1.5">
-                    {subjectEntries.length} approved {subjectEntries.length === 1 ? 'entry' : 'entries'}
-                  </p>
-
-                  {/* Teacher's unit-based evaluation */}
-                  {hasTeacherRating && (
-                    <div className="mt-3 pt-3 border-t border-slate-50">
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
-                        Teacher's Evaluation
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {Object.entries(teacherAtlMap).map(([cat, label]) => {
-                          const { color, bg } = ATL_CATEGORIES[cat]
-                          return (
-                            <span
-                              key={cat}
-                              className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                              style={{ backgroundColor: bg, color }}
-                            >
-                              {cat.split('-')[0]}: {label}
-                            </span>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </motion.div>
-        </div>
-
-        {/* Recent reflections */}
         <motion.div variants={item}>
           <Card>
-            <CardHeader
-              title="Recent Reflections"
-              action={
-                <Link to="/analytics" className="text-xs text-navy-600 hover:underline">View all</Link>
-              }
-            />
-            {loading ? (
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-16 bg-slate-50 rounded-xl animate-pulse" />
-                ))}
+            <CardHeader title="Your units" subtitle={`${units.length} across your subjects`} />
+            {units.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-sm font-medium text-slate-700">Nothing here yet</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                  Units appear once your teachers create them and your class enrolment is confirmed.
+                </p>
               </div>
-            ) : recentEntries.length === 0 ? (
-              <EmptyReflections />
             ) : (
-              <div className="space-y-3">
-                {recentEntries.map(entry => (
-                  <ReflectionRow key={entry.id} entry={entry} />
-                ))}
+              <div className="space-y-2">
+                {units.map(u => <UnitRow key={u.id} unit={u} />)}
               </div>
             )}
           </Card>
         </motion.div>
 
-        {/* ATL category cards */}
-        <motion.div variants={item}>
-          <h3 className="section-title mb-3">ATL Skills Overview</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            {ATL_CATEGORY_KEYS.map(cat => {
-              const { color, bg } = ATL_CATEGORIES[cat]
-              const val = analytics.categoryAverages[cat]
-              return (
-                <div key={cat} className="card p-4">
-                  <div className="w-8 h-8 rounded-xl mb-3 flex items-center justify-center" style={{ backgroundColor: bg }}>
-                    <span className="text-base" style={{ color }}>{cat[0]}</span>
-                  </div>
-                  <p className="text-sm font-medium text-slate-800 leading-tight">{cat}</p>
-                  <p className="text-xl font-semibold mt-1" style={{ color }}>
-                    {val > 0 ? val.toFixed(1) : '—'}
-                  </p>
-                  <p className="text-xs text-slate-400">/ 4.0</p>
-                </div>
-              )
-            })}
-          </div>
-        </motion.div>
+        {ratings.length > 0 && (
+          <motion.div variants={item}>
+            <TeacherRatings ratings={ratings} />
+          </motion.div>
+        )}
       </motion.div>
     </PageLayout>
   )
 }
 
-function StatCard({ label, value, icon: Icon, color, sub }) {
-  const palette = {
-    blue:   { bg: '#eff6ff', color: '#3b82f6' },
-    green:  { bg: '#f0fdf4', color: '#22c55e' },
-    amber:  { bg: '#fffbeb', color: '#f59e0b' },
-    purple: { bg: '#faf5ff', color: '#a855f7' },
+function UnitRow({ unit }) {
+  const status = unit.reflectionStatus
+  const badge =
+    status === 'approved' ? { cls: 'bg-emerald-50 text-emerald-700', text: 'Approved' }
+  : status === 'pending'  ? { cls: 'bg-gold-100 text-gold-800',      text: 'Awaiting review' }
+  : status === 'returned' ? { cls: 'bg-rose-50 text-rose-700',       text: 'Needs revision' }
+  : !unit.isOpen          ? { cls: 'bg-slate-100 text-slate-500',    text: 'Closed' }
+  :                         { cls: 'bg-navy-50 text-navy-700',       text: 'Not started' }
+
+  const clickable = !status || status === 'returned'
+
+  const body = (
+    <div className={`flex items-center justify-between gap-3 p-3 rounded-xl transition-colors
+      ${clickable && unit.isOpen ? 'hover:bg-slate-50 cursor-pointer' : ''}`}>
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-slate-900 truncate">{unit.name}</p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {unit.subjectName} · {unit.term} · {unit.subskills?.length ?? 0} sub-skills
+        </p>
+      </div>
+      <span className={`badge shrink-0 ${badge.cls}`}>{badge.text}</span>
+    </div>
+  )
+
+  return clickable && unit.isOpen ? <Link to={`/reflect?unitId=${unit.id}`}>{body}</Link> : body
+}
+
+function TeacherRatings({ ratings }) {
+  // Group by subject, then average each category so the student sees one honest
+  // number per skill rather than a wall of per-unit rows.
+  const bySubject = ratings.reduce((acc, r) => {
+    (acc[r.subjectName] ??= []).push(r)
+    return acc
+  }, {})
+
+  return (
+    <Card>
+      <CardHeader title="What your teachers said" subtitle="From published term reports" />
+      <div className="space-y-4">
+        {Object.entries(bySubject).map(([subject, list]) => {
+          const byCategory = list.reduce((acc, r) => {
+            (acc[r.categoryName] ??= { colour: r.colour, bg: r.bgColour, scores: [] })
+              .scores.push(SCORE_MAP[r.level] ?? 0)
+            return acc
+          }, {})
+          return (
+            <div key={subject}>
+              <p className="text-sm font-medium text-slate-800 mb-2">{subject}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(byCategory).map(([cat, { colour, bg, scores }]) => {
+                  const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+                  return (
+                    <span key={cat} className="text-[11px] font-medium px-2 py-1 rounded-lg"
+                      style={{ backgroundColor: bg, color: colour }}>
+                      {cat}: {SCORE_LABEL[Math.round(avg)]}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </Card>
+  )
+}
+
+function Stat({ label, value, icon: Icon, tone }) {
+  const tones = {
+    navy:  { bg: '#f2f6fc', fg: '#123a8a' },
+    green: { bg: '#ecfdf5', fg: '#059669' },
+    gold:  { bg: '#fbf3e3', fg: '#a67c1f' },
+    slate: { bg: '#f8fafc', fg: '#475569' },
   }
-  const { bg, color: c } = palette[color]
+  const { bg, fg } = tones[tone]
   return (
     <div className="card p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: bg }}>
-          <Icon size={15} style={{ color: c }} />
-        </div>
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: bg }}>
+        <Icon size={15} style={{ color: fg }} />
       </div>
-      <p className="text-2xl font-semibold text-slate-900">
-        {value}{sub && <span className="text-sm text-slate-400 font-normal ml-0.5">{sub}</span>}
-      </p>
+      <p className="text-2xl font-semibold text-slate-900">{value}</p>
       <p className="text-xs text-slate-500 mt-0.5">{label}</p>
-    </div>
-  )
-}
-
-function ReflectionRow({ entry }) {
-  return (
-    <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors">
-      <div
-        className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-0.5"
-        style={{ backgroundColor: ATL_CATEGORIES[entry.atlCategory]?.bg ?? '#f8fafc' }}
-      >
-        <span className="text-sm font-semibold" style={{ color: ATL_CATEGORIES[entry.atlCategory]?.color ?? '#64748b' }}>
-          {entry.atlCategory?.[0]}
-        </span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap mb-0.5">
-          <span className="text-sm font-medium text-slate-800">{entry.subject}</span>
-          <CategoryBadge category={entry.atlCategory} />
-          <StatusBadge status={entry.approvalStatus} />
-        </div>
-        <p className="text-xs text-slate-500 leading-relaxed">{truncate(entry.reflection, 80)}</p>
-      </div>
-      <div className="flex-shrink-0 text-right">
-        <LevelBadge level={entry.selfAssessment} />
-        <p className="text-[10px] text-slate-400 mt-1">{formatDate(entry.createdAt)}</p>
-      </div>
-    </div>
-  )
-}
-
-function EmptyReflections() {
-  return (
-    <div className="py-10 flex flex-col items-center gap-3 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-navy-50 flex items-center justify-center">
-        <PenLine size={20} className="text-navy-400" />
-      </div>
-      <div>
-        <p className="text-sm font-medium text-slate-700">No entries yet</p>
-        <p className="text-xs text-slate-400 mt-0.5">Start tracking your ATL skills by submitting a reflection.</p>
-      </div>
-      <Link to="/reflect">
-        <Button size="sm">Create first entry</Button>
-      </Link>
     </div>
   )
 }

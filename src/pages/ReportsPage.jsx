@@ -1,182 +1,102 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, ChevronRight, Users, FileText } from 'lucide-react'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts'
+import { ChevronDown, Sparkles } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import {
-  subscribeToStudents,
-  subscribeToTeacherUnits,
-  subscribeToAllEntries,
-  saveUnitRating,
-  subscribeToTeacherStudentUnitRatings,
-} from '../firebase/firestore'
-import { getMyStudents } from '../utils/helpers'
+import { getRoster, getRatings, saveRating } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
-import { ATL_CATEGORIES, ATL_CATEGORY_KEYS, ASSESSMENT_LEVELS, SCORE_MAP, SCORE_LABEL } from '../utils/atlFramework'
+import { PageLoader } from '../components/ui/LoadingSpinner'
+import { ASSESSMENT_LEVELS, SCORE_MAP, SCORE_LABEL } from '../utils/atlFramework'
 import toast from 'react-hot-toast'
 
-const REPORT_TERMS = ['Term 1', 'Term 2', 'Term 3']
-const GRADE_TABS   = ['All', 'DP1', 'DP2']
+const TERMS = ['Term 1', 'Term 2', 'Term 3']
 
-const ATL_COLORS = {
-  Communication:    '#6366f1',
-  Social:           '#10b981',
-  'Self-management':'#f59e0b',
-  Research:         '#3b82f6',
-  Thinking:         '#ec4899',
-}
+// Rating is now per sub-skill. A student can be Proficient at one Thinking
+// sub-skill and Developing at another in the same unit, which is the whole
+// reason the sub-skill layer exists.
 
 export default function ReportsPage() {
-  const { user, userDoc } = useAuth()
-  const [selectedTerm, setSelectedTerm] = useState('Term 1')
-  const [gradeFilter, setGradeFilter] = useState('All')
-  const [allStudents, setAllStudents] = useState([])
-  const [units, setUnits] = useState([])
-  const [allEntries, setAllEntries] = useState([])
-  const [openStudent, setOpenStudent] = useState(null)
+  const { profile } = useAuth()
+  const sections = profile?.sections ?? []
+
+  const [picked_, setSectionId]   = useState('')
+  const [term, setTerm]           = useState('Term 1')
+  const [students, setStudents]   = useState([])
+  const [openId, setOpenId]       = useState(null)
+  const [loading, setLoading]     = useState(false)
+
+  // Derive rather than sync: first class is the default until one is picked.
+  const sectionId = picked_ || (sections[0] ? String(sections[0].id) : '')
+
 
   useEffect(() => {
-    const u1 = subscribeToStudents(setAllStudents)
-    const u2 = subscribeToTeacherUnits(user.uid, setUnits)
-    const u3 = subscribeToAllEntries(setAllEntries)
-    return () => { u1(); u2(); u3() }
-  }, [user])
+    if (!sectionId) return
+    setLoading(true)
+    setOpenId(null)
+    getRoster(sectionId)
+      .then(r => setStudents(r.students.filter(s => s.enrollmentStatus === 'active')))
+      .catch(err => toast.error(err.message))
+      .finally(() => setLoading(false))
+  }, [sectionId])
 
-  // Filter to this teacher's students only, then by grade
-  const myStudents = getMyStudents(userDoc?.displayName, userDoc?.teachingGroups, allStudents)
-  const students = gradeFilter === 'All'
-    ? myStudents
-    : myStudents.filter(s => s.grade === gradeFilter)
-
-  const termUnits = units.filter(u => u.term === selectedTerm)
+  if (!sections.length) {
+    return (
+      <PageLayout>
+        <div className="card p-10 text-center max-w-md mx-auto">
+          <p className="text-sm font-medium text-slate-800">No classes yet</p>
+          <p className="text-xs text-slate-500 mt-1">Set up your classes before writing reports.</p>
+        </div>
+      </PageLayout>
+    )
+  }
 
   return (
     <PageLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
-
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="page-title">Term Reports</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              Review student ATL evidence and set your final evaluations
-            </p>
-          </div>
-          <Link to="/units" className="btn-ghost text-sm flex items-center gap-1.5 border border-slate-200 px-3 py-2 rounded-xl">
-            <FileText size={14} />
-            Unit Planning
-          </Link>
+      <div className="space-y-5">
+        <div>
+          <h1 className="page-title">Term Reports</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Rate each sub-skill against what the student claimed
+          </p>
         </div>
 
-        {/* Term tabs + grade filter */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-2">
-            {REPORT_TERMS.map(t => (
-              <button
-                key={t}
-                onClick={() => { setSelectedTerm(t); setOpenStudent(null) }}
-                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
-                  selectedTerm === t
-                    ? 'bg-navy-700 text-white shadow-sm'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
-                }`}
-              >
+        <div className="flex flex-wrap gap-3">
+          <select className="input-base w-auto min-w-[220px]" value={sectionId}
+            onChange={e => setSectionId(e.target.value)}>
+            {sections.map(s => (
+              <option key={s.id} value={s.id}>{s.subjectName} · {s.grade}</option>
+            ))}
+          </select>
+          <div className="flex gap-1.5">
+            {TERMS.map(t => (
+              <button key={t} onClick={() => setTerm(t)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  term === t ? 'bg-navy-900 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}>
                 {t}
               </button>
             ))}
           </div>
-          <div className="flex gap-1.5 ml-auto">
-            {GRADE_TABS.map(g => (
-              <button
-                key={g}
-                onClick={() => { setGradeFilter(g); setOpenStudent(null) }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                  gradeFilter === g
-                    ? 'bg-slate-800 text-white'
-                    : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-300'
-                }`}
-              >
-                {g}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* Info pill if no units planned */}
-        {termUnits.length === 0 && (
-          <div className="card p-4 bg-amber-50 border-amber-100 flex items-center gap-3">
-            <span className="text-amber-500 text-sm">⚠</span>
-            <p className="text-xs text-amber-700">
-              No units planned for {selectedTerm} yet.{' '}
-              <Link to="/units" className="font-semibold underline">Go to Unit Planning →</Link>
+        {loading ? <PageLoader /> : students.length === 0 ? (
+          <div className="card p-10 text-center">
+            <p className="text-sm font-medium text-slate-800">No confirmed students in this class</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Students appear here once you confirm their enrolment request.
             </p>
           </div>
-        )}
-
-        {/* Student list */}
-        {myStudents.length === 0 ? (
-          <div className="card p-14 text-center">
-            <Users size={32} className="text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-500">No students in your classes yet</p>
-          </div>
         ) : (
-          <div className="space-y-3">
-            {students.map(student => {
-              const termUnitIds = new Set(termUnits.map(u => u.id))
-              const studentTermEntries = allEntries.filter(
-                e => e.studentId === student.id &&
-                     e.approvalStatus === 'approved' &&
-                     e.unitId && termUnitIds.has(e.unitId),
-              )
-              const isOpen = openStudent === student.id
-
-              return (
-                <div key={student.id} className="card overflow-hidden">
-                  {/* Clickable header */}
-                  <button
-                    onClick={() => setOpenStudent(isOpen ? null : student.id)}
-                    className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors text-left"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-navy-100 flex items-center justify-center text-navy-700 text-sm font-bold flex-shrink-0">
-                      {(student.displayName ?? '?')[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">{student.displayName}</p>
-                      <p className="text-xs text-slate-400">
-                        {student.grade} · {studentTermEntries.length} approved {selectedTerm} entries
-                      </p>
-                    </div>
-                    <div className="text-slate-400 flex-shrink-0">
-                      {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </div>
-                  </button>
-
-                  {/* Expanded report */}
-                  <AnimatePresence>
-                    {isOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.22 }}
-                        className="border-t border-slate-100 overflow-hidden"
-                      >
-                        <StudentReport
-                          teacherUid={user.uid}
-                          student={student}
-                          term={selectedTerm}
-                          termUnits={termUnits}
-                          studentEntries={studentTermEntries}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )
-            })}
+          <div className="space-y-2">
+            {students.map(s => (
+              <StudentReport
+                key={s.id}
+                student={s}
+                sectionId={Number(sectionId)}
+                term={term}
+                open={openId === s.id}
+                onToggle={() => setOpenId(openId === s.id ? null : s.id)}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -184,251 +104,175 @@ export default function ReportsPage() {
   )
 }
 
-// ─── Student expanded report ───────────────────────────────────────────────────
-
-function StudentReport({ teacherUid, student, term, termUnits, studentEntries }) {
-  const [ratings, setRatings] = useState({})   // key: `${unitId}_${atl}` → level string
-  const [saving, setSaving] = useState(null)
+function StudentReport({ student, sectionId, term, open, onToggle }) {
+  const [units, setUnits]     = useState(null)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    const unsub = subscribeToTeacherStudentUnitRatings(
-      teacherUid, student.id, term,
-      docs => {
-        const map = {}
-        docs.forEach(r => { map[`${r.unitId}_${r.atl}`] = r.level })
-        setRatings(map)
-      },
-    )
-    return unsub
-  }, [teacherUid, student.id, term])
+    if (!open || units) return
+    setLoading(true)
+    getRatings({ studentId: student.id, sectionId, term })
+      .then(r => setUnits(r.units))
+      .catch(err => toast.error(err.message))
+      .finally(() => setLoading(false))
+  }, [open])
 
-  // Build chart data — one bar group per unit, one bar per ATL skill
-  const allSkills = [...new Set(termUnits.flatMap(u => u.atlSkills))]
+  // Re-fetch when the term changes while open
+  useEffect(() => { setUnits(null) }, [term])
 
-  const chartData = termUnits.map(unit => {
-    const unitEntries = studentEntries.filter(e => e.unitId === unit.id)
-    const row = { unit: unit.unitName.length > 14 ? unit.unitName.slice(0, 13) + '…' : unit.unitName }
-    unit.atlSkills.forEach(skill => {
-      const skillEntries = unitEntries.filter(e => e.atlCategory === skill)
-      row[skill] = skillEntries.length
-        ? parseFloat((skillEntries.reduce((s, e) => s + (SCORE_MAP[e.selfAssessment] ?? 0), 0) / skillEntries.length).toFixed(2))
-        : 0
-    })
-    return row
-  })
-
-  async function handleRate(unitId, atl, level) {
-    const key = `${unitId}_${atl}`
-    setSaving(key)
+  async function rate(unitId, subskillId, level) {
     try {
-      await saveUnitRating({
-        teacherUid,
-        studentId: student.id,
-        studentName: student.displayName,
-        unitId,
-        atl,
-        level,
-        term,
-      })
-      toast.success('Rating saved')
-    } catch {
-      toast.error('Failed to save')
-    } finally {
-      setSaving(null)
+      await saveRating({ unitId, studentId: student.id, subskillId, level })
+      setUnits(prev => prev.map(u => u.unitId !== unitId ? u : {
+        ...u,
+        subskills: u.subskills.map(ss =>
+          ss.subskillId === subskillId ? { ...ss, teacherLevel: level } : ss),
+      }))
+    } catch (err) {
+      toast.error(err.message)
     }
   }
 
-  if (termUnits.length === 0) {
-    return (
-      <div className="p-6 text-center text-sm text-slate-400">
-        No units planned for {term}.{' '}
-        <Link to="/units" className="text-indigo-600 hover:underline">Add units →</Link>
-      </div>
-    )
-  }
-
-  const hasEntries = studentEntries.length > 0
+  const summary = units?.flatMap(u => u.subskills).filter(ss => ss.teacherLevel) ?? []
 
   return (
-    <div className="p-5 space-y-7">
-
-      {/* ── Chart: student self-assessment per unit ── */}
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Student self-assessment — {term}
-        </p>
-        {hasEntries ? (
-          <ResponsiveContainer width="100%" height={210}>
-            <BarChart data={chartData} barGap={3} barSize={16}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis dataKey="unit" tick={{ fontSize: 11, fill: '#64748b' }} />
-              <YAxis
-                domain={[0, 4]}
-                ticks={[1, 2, 3, 4]}
-                tickFormatter={v => (['', 'E', 'D', 'P', 'A'][v] || '')}
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
-                width={22}
-              />
-              <Tooltip
-                formatter={(val, name) => [
-                  ['', 'Emerging', 'Developing', 'Proficient', 'Advanced'][Math.round(val)] || '—',
-                  name,
-                ]}
-                contentStyle={{ borderRadius: 10, fontSize: 12, border: '1px solid #e2e8f0' }}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              {allSkills.map(skill => (
-                <Bar key={skill} dataKey={skill} fill={ATL_COLORS[skill] ?? '#94a3b8'} radius={[4, 4, 0, 0]} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="h-20 flex items-center justify-center text-xs text-slate-400 bg-slate-50 rounded-xl">
-            No approved entries for {term} yet — student hasn't submitted reflections linked to these units
-          </div>
-        )}
-      </div>
-
-      {/* ── Rating table per unit ── */}
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Your final evaluation
-          <span className="text-slate-400 font-normal normal-case ml-2">
-            — click a level button to set. Student sees this on their Analytics page.
-          </span>
-        </p>
-
-        <div className="space-y-4">
-          {termUnits.map(unit => {
-            const unitEntries = studentEntries.filter(e => e.unitId === unit.id)
-            return (
-              <div key={unit.id} className="rounded-xl border border-slate-100 overflow-hidden">
-                {/* Unit header */}
-                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-700">{unit.unitName}</p>
-                  <span className="text-[10px] text-slate-400">
-                    {unitEntries.length} {unitEntries.length === 1 ? 'entry' : 'entries'} from student
-                  </span>
-                </div>
-
-                {/* ATL skill rows */}
-                <div className="divide-y divide-slate-50">
-                  {unit.atlSkills.map(skill => {
-                    const skillEntries = unitEntries.filter(e => e.atlCategory === skill)
-                    const avgScore = skillEntries.length
-                      ? skillEntries.reduce((s, e) => s + (SCORE_MAP[e.selfAssessment] ?? 0), 0) / skillEntries.length
-                      : null
-                    const avgLabel = avgScore
-                      ? ['', 'Emerging', 'Developing', 'Proficient', 'Advanced'][Math.round(avgScore)]
-                      : null
-                    const currentRating = ratings[`${unit.id}_${skill}`]
-                    const isSaving = saving === `${unit.id}_${skill}`
-                    const { color, bg } = ATL_CATEGORIES[skill] ?? {}
-
-                    return (
-                      <div key={skill} className="flex items-center gap-3 px-4 py-3">
-                        {/* Skill name */}
-                        <span
-                          className="text-xs font-semibold w-28 flex-shrink-0"
-                          style={{ color }}
-                        >
-                          {skill}
-                        </span>
-
-                        {/* Student estimate */}
-                        <div className="w-24 flex-shrink-0">
-                          {avgLabel ? (
-                            <span
-                              className="text-[10px] px-2 py-1 rounded-lg font-medium"
-                              style={{ backgroundColor: bg, color }}
-                            >
-                              ~{avgLabel}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-300 italic">no data</span>
-                          )}
-                        </div>
-
-                        {/* 4-level buttons */}
-                        <div className="flex gap-1.5 flex-1">
-                          {ASSESSMENT_LEVELS.map(({ value, color: lc, bg: lb }) => (
-                            <button
-                              key={value}
-                              disabled={!!isSaving}
-                              onClick={() => handleRate(unit.id, skill, value)}
-                              className={`flex-1 py-2 rounded-xl text-[11px] font-bold border-2 transition-all ${
-                                currentRating === value
-                                  ? 'scale-105 shadow-sm'
-                                  : 'border-slate-100 text-slate-400 hover:border-slate-200 hover:text-slate-600'
-                              }`}
-                              style={currentRating === value
-                                ? { backgroundColor: lb, borderColor: lc, color: lc }
-                                : {}
-                              }
-                            >
-                              {value === 'Emerging' ? 'E' : value === 'Developing' ? 'D' : value === 'Proficient' ? 'P' : 'A'}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Current rating label */}
-                        <span className="text-xs text-slate-400 w-24 text-right flex-shrink-0">
-                          {currentRating ? (
-                            <span className="font-medium text-slate-600">→ {currentRating}</span>
-                          ) : '—'}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
+    <div className="card overflow-hidden">
+      <button onClick={onToggle} className="w-full flex items-center gap-3 p-4 text-left">
+        <div className="w-9 h-9 rounded-xl bg-navy-100 flex items-center justify-center shrink-0 text-navy-800 text-sm font-semibold">
+          {student.fullName?.charAt(0)}
         </div>
-      </div>
-
-      {/* ── Term Summary — aggregate across all units ── */}
-      {Object.keys(ratings).length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-            {term} Summary
-            <span className="font-normal normal-case text-slate-400 ml-2">— your final ratings across all units</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-900 truncate">{student.fullName}</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {student.approvedCount} approved · {student.pendingCount} awaiting review
           </p>
-          <div className="rounded-xl border border-slate-100 overflow-hidden">
-            {ATL_CATEGORY_KEYS.map(skill => {
-              // Collect all ratings for this skill across all units in this term
-              const skillRatings = Object.entries(ratings)
-                .filter(([key]) => key.endsWith(`_${skill}`))
-                .map(([, level]) => SCORE_MAP[level] ?? 0)
-                .filter(Boolean)
-              if (skillRatings.length === 0) return null
-              const avg = skillRatings.reduce((a, b) => a + b, 0) / skillRatings.length
-              const avgLabel = SCORE_LABEL[Math.round(avg)]
-              const { color, bg } = ATL_CATEGORIES[skill] ?? {}
-              return (
-                <div key={skill} className="flex items-center gap-4 px-4 py-3 border-b border-slate-50 last:border-0">
-                  <span className="text-xs font-semibold w-28 flex-shrink-0" style={{ color }}>{skill}</span>
-                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${(avg / 4) * 100}%`, backgroundColor: color }}
-                    />
-                  </div>
-                  <span
-                    className="text-xs font-semibold px-2.5 py-1 rounded-lg w-24 text-center"
-                    style={{ backgroundColor: bg, color }}
-                  >
-                    {avgLabel}
-                  </span>
-                  <span className="text-[10px] text-slate-400 w-12 text-right">
-                    {avg.toFixed(1)}/4
-                  </span>
-                </div>
-              )
-            }).filter(Boolean)}
+        </div>
+        <ChevronDown size={15} className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
+            className="overflow-hidden">
+            <div className="px-4 pb-4 pt-3 border-t border-slate-100 space-y-5">
+              {loading ? (
+                <div className="py-6 text-center text-sm text-slate-400">Loading</div>
+              ) : !units?.length ? (
+                <p className="py-4 text-sm text-slate-500 text-center">
+                  No units in {term} for this class yet.
+                </p>
+              ) : (
+                <>
+                  {units.map(u => (
+                    <div key={u.unitId}>
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <p className="text-sm font-semibold text-slate-800">{u.unitName}</p>
+                        {u.reflectionStatus
+                          ? <span className={`badge ${
+                              u.reflectionStatus === 'approved' ? 'bg-emerald-50 text-emerald-700'
+                              : u.reflectionStatus === 'pending' ? 'bg-gold-100 text-gold-800'
+                              : 'bg-rose-50 text-rose-700'}`}>
+                              {u.reflectionStatus}
+                            </span>
+                          : <span className="badge bg-slate-100 text-slate-500">no reflection</span>}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {u.subskills.map(ss => (
+                          <SubskillRating key={ss.subskillId} subskill={ss}
+                            onRate={level => rate(u.unitId, ss.subskillId, level)} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  {summary.length > 0 && <TermSummary rated={summary} term={term} />}
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function SubskillRating({ subskill: ss, onRate }) {
+  const agree = ss.selfLevel && ss.teacherLevel && ss.selfLevel === ss.teacherLevel
+  const gap   = ss.selfLevel && ss.teacherLevel
+    ? (SCORE_MAP[ss.teacherLevel] ?? 0) - (SCORE_MAP[ss.selfLevel] ?? 0) : null
+
+  return (
+    <div className="rounded-xl border border-slate-100 p-3">
+      <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-slate-800 leading-snug">
+            {ss.name}
+            {ss.isSubjectSpecific && <Sparkles size={9} className="inline ml-1 -mt-0.5 text-gold-600" />}
+          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded"
+              style={{ backgroundColor: ss.bgColour, color: ss.colour }}>
+              {ss.categoryName}
+            </span>
+            {ss.selfLevel
+              ? <span className="text-[10px] text-slate-500">Student said {ss.selfLevel}</span>
+              : <span className="text-[10px] text-slate-400 italic">not claimed</span>}
+            {gap !== null && gap !== 0 && (
+              <span className={`text-[10px] font-medium ${gap > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {gap > 0 ? `+${gap}` : gap}
+              </span>
+            )}
+            {agree && <span className="text-[10px] text-emerald-600 font-medium">agrees</span>}
           </div>
         </div>
+      </div>
+
+      {ss.evidenceNote && (
+        <p className="text-[11px] text-slate-500 mb-2 leading-relaxed italic">"{ss.evidenceNote}"</p>
       )}
+
+      <div className="flex gap-1">
+        {ASSESSMENT_LEVELS.map(l => (
+          <button key={l.value} onClick={() => onRate(l.value)}
+            className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-all
+              ${ss.teacherLevel === l.value ? '' : 'border-slate-200 text-slate-400 hover:border-slate-300'}`}
+            style={ss.teacherLevel === l.value
+              ? { backgroundColor: l.bg, borderColor: l.color, color: l.color } : {}}>
+            {l.value[0]}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TermSummary({ rated, term }) {
+  const byCategory = rated.reduce((acc, ss) => {
+    (acc[ss.categoryName] ??= { colour: ss.colour, bg: ss.bgColour, scores: [] })
+      .scores.push(SCORE_MAP[ss.teacherLevel] ?? 0)
+    return acc
+  }, {})
+
+  return (
+    <div className="rounded-xl bg-navy-50 p-4">
+      <p className="text-xs font-semibold text-navy-900 uppercase tracking-wide mb-2">
+        {term} summary
+      </p>
+      <p className="text-[11px] text-navy-700 mb-3">
+        Averaged across {rated.length} rated sub-skills in this term.
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {Object.entries(byCategory).map(([cat, { colour, bg, scores }]) => {
+          const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+          return (
+            <span key={cat} className="text-[11px] font-medium px-2 py-1 rounded-lg"
+              style={{ backgroundColor: bg, color: colour }}>
+              {cat}: {SCORE_LABEL[Math.round(avg)]}
+            </span>
+          )
+        })}
+      </div>
     </div>
   )
 }
