@@ -17,7 +17,12 @@ export class ApiError extends Error {
   }
 }
 
+// Matches DEV_LOGIN_AS on the API side. Vite only defines import.meta.env.DEV
+// in a dev build, so this branch cannot survive into production.
+export const DEV_LOGIN = import.meta.env.DEV && import.meta.env.VITE_DEV_LOGIN === '1'
+
 async function token() {
+  if (DEV_LOGIN) return 'dev'
   const user = auth.currentUser
   if (!user) throw new ApiError(401, 'You are signed out')
   return user.getIdToken()

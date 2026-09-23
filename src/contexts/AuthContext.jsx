@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '../firebase/config'
-import { getMe, ApiError } from '../api/client'
+import { getMe, ApiError, DEV_LOGIN } from '../api/client'
 
 const AuthContext = createContext(null)
 
@@ -31,6 +31,12 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
+    // Dev login: there is no Google session to wait for, so go straight to /me.
+    if (DEV_LOGIN) {
+      setUser({ email: 'dev@local', uid: 'dev' })
+      load().finally(() => setLoading(false))
+      return
+    }
     return onAuthStateChanged(auth, async firebaseUser => {
       setUser(firebaseUser)
       if (firebaseUser) await load()

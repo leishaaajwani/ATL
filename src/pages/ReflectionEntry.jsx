@@ -63,10 +63,15 @@ export default function ReflectionEntry() {
     setPrompts(DEFAULT_PROMPTS)
   }, [])
 
-  const tickedIds = useMemo(
-    () => Object.keys(ticks).filter(id => ticks[id]?.selfLevel && ticks[id]?.evidenceNote?.trim().length >= 10),
-    [ticks],
+  // A tick only counts once it carries evidence, but the counter has to show
+  // what the student can see themselves, or three ticked boxes reading "0 / 3"
+  // looks broken. Count the boxes, and say separately what is still missing.
+  const checkedIds = useMemo(() => Object.keys(ticks), [ticks])
+  const tickedIds  = useMemo(
+    () => checkedIds.filter(id => ticks[id]?.selfLevel && ticks[id]?.evidenceNote?.trim().length >= 10),
+    [ticks, checkedIds],
   )
+  const needEvidence = checkedIds.length - tickedIds.length
   const threshold  = unit?.minSubskills ?? 3
   const unlocked   = tickedIds.length >= threshold
   const locked     = existing?.status === 'approved' || existing?.status === 'pending'
@@ -80,7 +85,11 @@ export default function ReflectionEntry() {
 
   async function submit(e) {
     e.preventDefault()
-    if (!unlocked) return toast.error(`Tick at least ${threshold} sub-skills first`)
+    if (!unlocked) {
+      return toast.error(needEvidence > 0
+        ? `${needEvidence} of your ticked sub-skills still needs an evidence note`
+        : `Tick at least ${threshold} sub-skills first`)
+    }
 
     for (const p of prompts) {
       const w = countWords(answers[p.id])
@@ -171,7 +180,7 @@ export default function ReflectionEntry() {
                     Which of these did you actually do?
                   </h2>
                   <span className={`text-xs font-semibold ${unlocked ? 'text-emerald-600' : 'text-slate-400'}`}>
-                    {tickedIds.length} / {threshold}
+                    {checkedIds.length} / {threshold}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mb-4 leading-relaxed">
@@ -207,8 +216,9 @@ export default function ReflectionEntry() {
 
               {!unlocked ? (
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Tick {threshold - tickedIds.length} more sub-skill
-                  {threshold - tickedIds.length === 1 ? '' : 's'} to unlock these questions.
+                  {checkedIds.length < threshold
+                    ? `Tick ${threshold - checkedIds.length} more sub-skill${threshold - checkedIds.length === 1 ? '' : 's'} to unlock these questions.`
+                    : `Add an evidence note to ${needEvidence} of the sub-skills you ticked. A tick without evidence does not count.`}
                 </p>
               ) : (
                 <div className="space-y-5">

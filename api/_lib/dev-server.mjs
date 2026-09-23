@@ -17,6 +17,30 @@ const PORT = Number(process.env.API_PORT ?? 3001)
 
 const exists = async p => { try { await stat(p); return true } catch { return false } }
 
+// DEV_LOGIN_AS lets you click through the app before the Firebase service
+// account key exists: every request is treated as that roster email.
+//
+// This can only ever work locally. Vercel imports the files in /api directly
+// and never runs this file, and the seam it uses refuses to install itself when
+// NODE_ENV is production. It is a development convenience, not a back door.
+async function installDevLogin() {
+  const email = process.env.DEV_LOGIN_AS?.trim().toLowerCase()
+  if (!email) return null
+
+  const { q1 } = await import('./db.js')
+  const { __setAuthenticatorForTests, HttpError } = await import('./auth.js')
+
+  __setAuthenticatorForTests(async () => {
+    const user = await q1(
+      `SELECT id, email, full_name, role, status, google_sub FROM users WHERE email = ?`,
+      [email],
+    )
+    if (!user) throw new HttpError(403, `DEV_LOGIN_AS is set to ${email}, which is not on the roster`)
+    return user
+  })
+  return email
+}
+
 async function resolveRoute(pathname) {
   const rel = pathname.replace(/^\/api\/?/, '').replace(/\/+$/, '')
   if (!rel || rel.includes('..')) return null
@@ -79,10 +103,16 @@ const server = createServer(async (req, res) => {
   }
 })
 
+const devUser = await installDevLogin()
+
 server.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`)
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-    console.log('\n  FIREBASE_SERVICE_ACCOUNT is not set, so every request will 401.')
-    console.log('  Firebase console > Project settings > Service accounts > Generate new private key\n')
+  if (devUser) {
+    console.log(`\n  AUTH BYPASSED. Every request is ${devUser}.`)
+    console.log('  Local only. Unset DEV_LOGIN_AS to use real Google sign-in.\n')
+  } else if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.log('\n  FIREBASE_SERVICE_ACCOUNT is not set, so every request will fail.')
+    console.log('  Either add the key, or set DEV_LOGIN_AS=<roster email> to click')
+    console.log('  through locally without it.\n')
   }
 })
