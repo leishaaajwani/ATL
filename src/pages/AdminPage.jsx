@@ -141,8 +141,8 @@ function ImportCsv({ role, onDone }) {
       </p>
       <textarea className="input-base resize-none font-mono !text-xs" rows={5}
         placeholder={role === 'student'
-          ? 'Neethu Pillai, neethu@school.ae, DP1'
-          : 'Sheldon Dias, sheldon@school.ae, T1043'}
+          ? 'Priya Raman, p.raman@school.edu, DP1'
+          : 'Daniel Fry, d.fry@school.edu, T1043'}
         value={csv} onChange={e => setCsv(e.target.value)} />
       <button className="btn-primary w-full" disabled={busy || !csv.trim()}>
         {busy ? 'Importing' : `Import ${role}s`}

@@ -48,7 +48,7 @@ Everyone else is added through the admin interface from then on.
 ## Schema notes
 
 **`sections` is the access-control boundary.** One row per taught class
-(DP1 Math AI, Mahek, 2026-27). A teacher sees a student's work only when that
+(DP1 Math AI, one teacher, 2026-27). A teacher sees a student's work only when that
 student has an `active` enrollment in a section the teacher owns. Every
 teacher-facing query joins through it. This replaces the old approach of
 downloading every document and filtering in the browser.

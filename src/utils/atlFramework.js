@@ -114,35 +114,9 @@ export const SUBJECTS = [
   'Visual Arts',
 ]
 
-export const SUBJECT_TEACHERS = {
-  'English Literature': ['JULIA ROBERTSON'],
-  'English Language and Literature': ['SHELDON DIAS', 'RUCHI SINGH', 'SINDHU JOSEPH', 'RUMANA FIRDOSE AZEEZ', 'AARTI SETH', 'ANVITA ZUTSHI'],
-  'Theory of Knowledge': ['RUMANA FIRDOSE AZEEZ', 'DIVYA RAJGARHIA', 'PALIYATH VINAYA VENUGOPAL', 'SRIVIDYA JAGATHRAKSHAGAN', 'BINITA JOSHI'],
-  'German Ab Initio': ['SHIVANI MAHESHWARI'],
-  'French Ab Initio': ['MOHAMED AIT ABDELLAH'],
-  'Hindi B': ['PRITI SHEKHAWAT'],
-  'Spanish Ab Initio': ['PRIYA GURNANI', 'SAHANA MITRA'],
-  'Spanish B': ['SAHANA MITRA'],
-  'French B': ['FATIMA POONAWALA'],
-  'Chemistry': ['PALIYATH VINAYA VENUGOPAL', 'ANJANA NAINAN', 'SIMI SUDHEENDRAN'],
-  'Computer Science': ['MALINI MURALI', 'KAMALPREET DHALIWAL'],
-  'Business Management': ['ERIYAT LAKSHMI DEVI', 'NARAHARI SHASTRY VALSALAMARRY', 'RAJANI JOHN', 'SIBY'],
-  'Environmental Systems and Societies SL': ['VANDANA MATHUR'],
-  'Digital Society': ['RITESH DHANAK'],
-  'Social and Cultural Anthropology HL': ['CHARLES MIRANDA'],
-  'Psychology': ['SHILPA BALDEV KUMAR SHARMA', 'MARIA ARULDASS'],
-  'Biology': ['PRASHANSA RAIZADA', 'SRIVIDYA JAGATHRAKSHAGAN'],
-  'Economics': ['SRIVIDHYA SATHYAMURTHI', 'JOYDEEP CHATERJEE', 'SAGARIKA BANERJEE'],
-  'Math AA': ['SHIBA SETHI JUNEJA', 'SHELY DAS', 'SHEHLA ABBASI', 'NARESH YALAVARTHI'],
-  'Math AI': ['MAHEK AJWANI', 'GIRISH'],
-  'Physics': ['SHRUTI TALWAR', 'HAFSA FAISAL', 'ANEESH VEETIL'],
-  'Global Politics': ['TRAFFORD GREGGORY', 'HAWABIBI'],
-  'Music': ['AXEL RODERICKS'],
-  'Sports, Health and Exercise Science': ['KUSHAL SACHDEVA'],
-  'History': ['AYOTI'],
-  'Geography': ['RAJKUMAR'],
-  'Visual Arts': ['MITHRA ASHRAT BHARUCHA'],
-}
+// The staff directory used to live here as a hardcoded constant. It is gone:
+// teachers are rows in the `users` table now, added through the admin roster,
+// so real names never sit in source control.
 
 export const GRADES = ['DP1', 'DP2']
 

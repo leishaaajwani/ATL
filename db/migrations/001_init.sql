@@ -2,7 +2,7 @@
 -- MySQL 8.0+
 --
 -- Design notes:
---   * A "section" is one taught class (DP1 Math AI, Mahek, 2026-27). This is the
+--   * A "section" is one taught class (DP1 Math AI, one teacher, 2026-27). This is the
 --     unit of access control. Everything hangs off it.
 --   * Sub-skills are either generic (subject_id IS NULL) or subject-scoped.
 --     Thinking and Communication are the categories that get subject-scoped ones.

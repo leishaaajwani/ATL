@@ -88,8 +88,8 @@ const subjectByName = new Map(subjectRows.map(s => [clean(s.name), s.id]))
 const uidToDbId = new Map()   // firestore uid -> mysql users.id
 const teachersByName = new Map()
 
-// The old data lets one email exist twice with different roles (Leishaa is both
-// a teacher and a student on leishaa@atpstem.net). MySQL has one row per email,
+// The old data lets one email exist twice with different roles (the same person
+// a teacher and a student on the same address). MySQL has one row per email,
 // so resolve the conflict deliberately rather than letting write order decide:
 // teacher wins, because a teacher row carries sections that students do not.
 const roleByEmail = new Map()

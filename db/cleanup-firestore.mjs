@@ -10,9 +10,9 @@
 // Firestore has no undo, so read the report before you pass --fix.
 //
 // What it looks for:
-//   1. Duplicate user docs sharing one email (Sheldon Dias exists twice)
-//   2. One email registered as both teacher and student (leishaa@atpstem.net)
-//   3. Entries pointing at user docs that no longer exist (19 of them)
+//   1. Duplicate user docs sharing one email
+//   2. One email registered as both teacher and student
+//   3. Entries pointing at user docs that no longer exist
 //   4. Students carrying leftover teachingGroups, teachers carrying subjects
 
 import 'dotenv/config'
