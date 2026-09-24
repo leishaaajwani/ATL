@@ -61,7 +61,7 @@ export default function UnitPlanning() {
           <div>
             <h1 className="page-title">Unit Planning</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Tag the ATL sub-skills each unit actually develops
+              Pick the ATL skills each unit really builds
             </p>
           </div>
           <select className="input-base w-auto min-w-[220px]" value={sectionId}
@@ -152,9 +152,10 @@ function NewUnitForm({ sectionId, subjectName, grade, catalogue, onDone }) {
           <span className="text-xs text-slate-400">{picked.size} tagged</span>
         </div>
         <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-          Showing {grade?.startsWith('MYP') ? 'MYP' : 'DP'} sub-skills for {subjectName}.
-          The marked ones are written for this subject specifically. Students see
-          only what you tick, so leave out anything this unit does not genuinely develop.
+          These are the {grade?.startsWith('MYP') ? 'MYP' : 'DP'} sub-skills for {subjectName}.
+          The starred ones were written for this subject. Your students will only
+          see what you tick, so it is worth leaving out anything this unit does not
+          really build.
         </p>
 
         <div className="space-y-4">
@@ -192,12 +193,12 @@ function NewUnitForm({ sectionId, subjectName, grade, catalogue, onDone }) {
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
         <label className="text-xs text-slate-600 flex items-center gap-2">
-          Students must tick at least
+          Students need to tick at least
           <select className="input-base !w-16 !py-1.5 !px-2 text-xs" value={minRequired}
             onChange={e => setMin(Number(e.target.value))}>
             {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
-          before reflecting
+          before they can write their reflection
         </label>
         <button className="btn-accent" disabled={saving}>
           {saving ? 'Creating' : 'Create unit'}
@@ -212,7 +213,7 @@ function UnitList({ units }) {
     return (
       <div className="card p-10 text-center">
         <p className="text-sm font-medium text-slate-800">No units in this class yet</p>
-        <p className="text-xs text-slate-500 mt-1">Create one so students have something to reflect on.</p>
+        <p className="text-xs text-slate-500 mt-1">Add one and your students will see it straight away.</p>
       </div>
     )
   }

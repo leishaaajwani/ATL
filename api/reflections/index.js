@@ -58,8 +58,8 @@ export default handler({ methods: ['GET', 'POST'], roles: ['student'] }, async (
       WHERE u.id = ?`,
     [user.id, unitId],
   )
-  if (!unit) throw new HttpError(403, 'That unit is not open to you')
-  if (!unit.is_open) throw new HttpError(409, 'This unit is closed for submissions')
+  if (!unit) throw new HttpError(403, 'You are not in the class this unit belongs to')
+  if (!unit.is_open) throw new HttpError(409, 'Your teacher has closed this unit')
 
   // Every ticked sub-skill must be one the teacher actually tagged on this unit.
   const tagged = await q(
@@ -72,14 +72,14 @@ export default handler({ methods: ['GET', 'POST'], roles: ['student'] }, async (
   for (const t of ticks) {
     const id = Number(t.subskillId)
     if (!taggedIds.has(id)) {
-      throw new HttpError(400, 'One of those sub-skills is not part of this unit')
+      throw new HttpError(400, 'One of those sub-skills is not on this unit')
     }
     if (!LEVELS.includes(t.selfLevel)) {
       throw new HttpError(400, `selfLevel must be one of ${LEVELS.join(', ')}`)
     }
     const note = String(t.evidenceNote ?? '').trim()
     if (note.length < 10) {
-      throw new HttpError(400, 'Each ticked sub-skill needs a short evidence note')
+      throw new HttpError(400, 'Every sub-skill you tick needs a short note saying where you did it')
     }
     cleanTicks.push({ subskillId: id, selfLevel: t.selfLevel, evidenceNote: note.slice(0, 500) })
   }
@@ -87,7 +87,7 @@ export default handler({ methods: ['GET', 'POST'], roles: ['student'] }, async (
   if (cleanTicks.length < unit.minRequired) {
     throw new HttpError(
       400,
-      `Tick at least ${unit.minRequired} sub-skills before writing your reflection`,
+      `Pick at least ${unit.minRequired} sub-skills before writing your reflection`,
       'BELOW_SUBSKILL_THRESHOLD',
     )
   }
@@ -105,7 +105,7 @@ export default handler({ methods: ['GET', 'POST'], roles: ['student'] }, async (
     if (words < p.minWords) {
       throw new HttpError(
         400,
-        `"${p.question}" needs at least ${p.minWords} words (you wrote ${words})`,
+        `"${p.question}" needs ${p.minWords} words. You wrote ${words}.`,
         'ANSWER_TOO_SHORT',
       )
     }
@@ -120,10 +120,10 @@ export default handler({ methods: ['GET', 'POST'], roles: ['student'] }, async (
     )
 
     if (existing && existing.status === 'approved') {
-      throw new HttpError(409, 'This reflection is already approved and cannot be changed')
+      throw new HttpError(409, 'Your teacher already approved this one')
     }
     if (existing && existing.status === 'pending') {
-      throw new HttpError(409, 'This reflection is already awaiting review')
+      throw new HttpError(409, 'This is already with your teacher')
     }
 
     let reflectionId

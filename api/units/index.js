@@ -46,12 +46,12 @@ export default handler({ methods: ['GET', 'POST'] }, async (req, res, user) => {
     throw new HttpError(400, 'term must be Term 1, Term 2 or Term 3')
   }
   if (!subskillIds.length) {
-    throw new HttpError(400, 'Tag at least one ATL sub-skill for this unit')
+    throw new HttpError(400, 'Pick at least one ATL sub-skill for this unit')
   }
   if (minSubskills > subskillIds.length) {
     throw new HttpError(
       400,
-      `You cannot require ${minSubskills} sub-skills when only ${subskillIds.length} are tagged`,
+      `You have asked for ${minSubskills} ticks but only picked ${subskillIds.length} sub-skills`,
       'THRESHOLD_ABOVE_TAGGED',
     )
   }
@@ -89,7 +89,7 @@ export default handler({ methods: ['GET', 'POST'] }, async (req, res, user) => {
       id = r.insertId
     } catch (err) {
       if (err.code === 'ER_DUP_ENTRY') {
-        throw new HttpError(409, 'A unit with that name already exists in this term')
+        throw new HttpError(409, 'You already have a unit with that name this term')
       }
       throw err
     }

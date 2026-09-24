@@ -59,7 +59,7 @@ export default function StudentsPage() {
           <div>
             <h1 className="page-title">Students</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Confirm who is actually in your class
+              Confirm who is really in your class
             </p>
           </div>
           <select className="input-base w-auto min-w-[220px]" value={sectionId}
@@ -77,7 +77,7 @@ export default function StudentsPage() {
                 <div className="flex items-center gap-2 mb-3">
                   <Clock size={15} className="text-gold-700" />
                   <p className="text-sm font-semibold text-navy-900">
-                    {pending.length} awaiting your confirmation
+                    {pending.length} {pending.length === 1 ? 'student says' : 'students say'} they are in this class
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -90,7 +90,7 @@ export default function StudentsPage() {
                       </div>
                       <div className="flex gap-1.5 shrink-0">
                         <button className="p-2 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
-                          title="Not my student" onClick={() => decide(s.enrollmentId, 'drop')}>
+                          title="Not in my class" onClick={() => decide(s.enrollmentId, 'drop')}>
                           <X size={15} />
                         </button>
                         <button className="p-2 rounded-lg bg-navy-900 text-white hover:bg-navy-800 transition-colors"
@@ -108,7 +108,8 @@ export default function StudentsPage() {
               <div className="card p-10 text-center">
                 <p className="text-sm font-medium text-slate-800">No confirmed students</p>
                 <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                  Students pick their own classes during setup, and appear here for you to confirm.
+                  Students pick their own classes when they sign in, and turn up here
+                  for you to wave through.
                 </p>
               </div>
             ) : (

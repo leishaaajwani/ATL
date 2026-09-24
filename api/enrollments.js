@@ -24,7 +24,7 @@ export default handler({ methods: ['POST', 'PATCH'] }, async (req, res, user) =>
         WHERE s.id = ? AND s.grade = sp.grade`,
       [user.id, sectionId],
     )
-    if (!ok) throw new HttpError(400, 'That class is not open to your grade')
+    if (!ok) throw new HttpError(400, 'That class is for a different year group')
 
     try {
       await q(
@@ -33,7 +33,7 @@ export default handler({ methods: ['POST', 'PATCH'] }, async (req, res, user) =>
         [sectionId, user.id],
       )
     } catch (err) {
-      if (err.code === 'ER_DUP_ENTRY') throw new HttpError(409, 'You already requested this class')
+      if (err.code === 'ER_DUP_ENTRY') throw new HttpError(409, 'You have already asked to join this one')
       throw err
     }
     return res.status(201).json({ status: 'pending' })

@@ -17,7 +17,7 @@ export default handler({ methods: ['POST'], roles: ['teacher'] }, async (req, re
     throw new HttpError(400, "action must be 'approve' or 'return'")
   }
   if (action === 'return' && !String(feedback ?? '').trim()) {
-    throw new HttpError(400, 'Returning a reflection requires feedback for the student')
+    throw new HttpError(400, 'Tell the student what to change before sending it back')
   }
 
   // Ownership: the reflection must sit in a unit in a section this teacher owns.
@@ -29,7 +29,7 @@ export default handler({ methods: ['POST'], roles: ['teacher'] }, async (req, re
       WHERE r.id = ? AND s.teacher_id = ?`,
     [reflectionId, user.id],
   )
-  if (!reflection) throw new HttpError(403, 'That reflection is not yours to review')
+  if (!reflection) throw new HttpError(403, 'That student is not in one of your classes')
   if (reflection.status !== 'pending') {
     throw new HttpError(409, `This reflection is ${reflection.status}, not awaiting review`)
   }

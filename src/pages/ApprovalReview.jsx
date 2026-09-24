@@ -31,7 +31,7 @@ export default function ApprovalReview() {
         <div>
           <h1 className="page-title">Approvals</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Review what students claim they demonstrated, then approve or send it back
+            See what your students say they did, then approve it or send it back
           </p>
         </div>
 
@@ -50,7 +50,7 @@ export default function ApprovalReview() {
           <div className="card p-12 text-center">
             <CheckCircle2 size={28} className="text-emerald-500 mx-auto mb-3" />
             <p className="text-sm font-medium text-slate-800">
-              {tab === 'pending' ? 'Nothing waiting on you' : `No ${tab} reflections`}
+              {tab === 'pending' ? 'All caught up' : `Nothing here yet`}
             </p>
           </div>
         ) : (
@@ -88,7 +88,7 @@ function ReflectionCard({ reflection: r, onDone }) {
     setBusy(true)
     try {
       await reviewReflection(r.id, modal, feedback)
-      toast.success(modal === 'approve' ? 'Approved' : 'Sent back to the student')
+      toast.success(modal === 'approve' ? 'Approved' : 'Sent back to them')
       setModal(null)
       await onDone()
     } catch (err) {
@@ -139,7 +139,7 @@ function ReflectionCard({ reflection: r, onDone }) {
 
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                    Claimed sub-skills and evidence
+                    What they say they did
                   </p>
                   <div className="space-y-2">
                     {r.ticks?.map(t => (
@@ -179,11 +179,11 @@ function ReflectionCard({ reflection: r, onDone }) {
                 </div>
 
                 <EvidenceList files={files.filter(f => f.subskillId === null)}
-                  label="Evidence for the whole unit" />
+                  label="Attached to the whole unit" />
 
                 {r.teacherFeedback && (
                   <div className="rounded-xl bg-navy-50 p-3">
-                    <p className="text-xs font-semibold text-navy-800 mb-1">Your previous feedback</p>
+                    <p className="text-xs font-semibold text-navy-800 mb-1">What you told them last time</p>
                     <p className="text-sm text-navy-900 leading-relaxed">{r.teacherFeedback}</p>
                   </div>
                 )}
@@ -209,14 +209,14 @@ function ReflectionCard({ reflection: r, onDone }) {
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
             {modal === 'approve'
-              ? `Approving ${r.studentName}'s reflection on ${r.unitName}.`
-              : `${r.studentName} will see your comment and can revise this same reflection. It stays attached to ${r.unitName}, so a different entry will not satisfy it.`}
+              ? `This marks ${r.studentName}'s work on ${r.unitName} as done.`
+              : `${r.studentName} will see your note and can rewrite this one. It stays tied to ${r.unitName}, so they cannot swap in a different entry instead.`}
           </p>
           <textarea className="input-base resize-none" rows={4} value={feedback}
             onChange={e => setFb(e.target.value)}
             placeholder={modal === 'approve'
-              ? 'Optional comment for the student'
-              : 'What should they change? This is required.'} />
+              ? 'Anything you want to say to them (optional)'
+              : 'What should they change? They will see exactly this.'} />
           <div className="flex justify-end gap-2">
             <button className="btn-ghost" onClick={() => setModal(null)}>Cancel</button>
             <button className="btn-accent" disabled={busy || (modal === 'return' && !feedback.trim())}

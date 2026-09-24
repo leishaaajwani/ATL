@@ -69,9 +69,9 @@ export default function EvidenceDropbox({ unitId, subskillId = null, files, onCh
         <span className="flex items-center gap-2">
           <Upload size={14} className={dragging ? 'text-gold-700' : 'text-slate-400'} />
           <span className="text-[11px] text-slate-600">
-            {busy ? 'Uploading'
+            {busy ? 'Uploading…'
               : dragging ? 'Drop to attach'
-              : 'Drop a file here, or click to attach evidence'}
+              : 'Drop a photo or file here, or click to browse'}
           </span>
         </span>
       </button>

@@ -100,7 +100,43 @@
   }
 }
 
+/* Modern Eventure moves the way a native app does: surfaces settle rather than
+   snap, and pressing something answers immediately. These three rules carry
+   most of that feel across the app. */
+
+@layer components {
+  /* Cards lift very slightly on hover, and press down when clicked, so
+     anything tappable feels physical. */
+  .card-lift {
+    @apply card transition-all duration-200 ease-out
+           hover:shadow-card-md hover:-translate-y-px
+           active:translate-y-0 active:shadow-card;
+  }
+
+  /* Buttons acknowledge the press before the network answers. */
+  .btn-primary, .btn-accent, .btn-secondary, .btn-danger {
+    @apply active:scale-[0.98];
+  }
+
+  /* Rows tint on hover rather than drawing a border, which keeps long lists
+     calm while still responding. */
+  .hover-tint {
+    @apply transition-colors duration-200 hover:bg-slate-50/80;
+  }
+}
+
 @layer utilities {
+  /* Respect the OS setting. Somebody who has asked for less motion should get
+     the interface, not the choreography. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

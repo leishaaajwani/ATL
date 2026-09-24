@@ -17,7 +17,7 @@ export default function NotOnRoster() {
           GEMS Modern Academy
         </p>
         <h1 className="text-2xl font-semibold text-white mb-3">
-          {isNetwork ? 'Cannot reach the server' : 'You are not on the roster yet'}
+          {isNetwork ? 'Cannot reach the server' : 'We do not have you on the list yet'}
         </h1>
         <p className="text-navy-200 text-sm leading-relaxed mb-2">
           {rejection?.message}
@@ -25,7 +25,7 @@ export default function NotOnRoster() {
         {user?.email && !isNetwork && (
           <p className="text-navy-300 text-xs mb-6">
             You signed in as <span className="text-white font-medium">{user.email}</span>.
-            If that is not your school address, sign out and try the right one.
+            If that is not your school address, sign out and try the other one.
           </p>
         )}
 

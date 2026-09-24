@@ -84,13 +84,13 @@ async function upload(req, res, user) {
     throw new HttpError(400, 'unitId, fileName, contentType and dataBase64 are required')
   }
   if (!ALLOWED_TYPES.has(contentType)) {
-    throw new HttpError(400, `${contentType} is not an accepted file type`, 'BAD_TYPE')
+    throw new HttpError(400, 'That file type will not upload. Photos, PDFs and documents are fine.', 'BAD_TYPE')
   }
 
   const buffer = Buffer.from(dataBase64, 'base64')
   if (!buffer.length) throw new HttpError(400, 'That file is empty')
   if (buffer.length > MAX_BYTES) {
-    throw new HttpError(400, `Files must be under ${MAX_BYTES / 1024 / 1024} MB`, 'TOO_LARGE')
+    throw new HttpError(400, `That file is too big. Keep it under ${MAX_BYTES / 1024 / 1024} MB.`, 'TOO_LARGE')
   }
 
   // The student must be actively enrolled in the class this unit belongs to.
@@ -102,7 +102,7 @@ async function upload(req, res, user) {
       WHERE u.id = ?`,
     [user.id, unitId],
   )
-  if (!unit) throw new HttpError(403, 'That unit is not open to you')
+  if (!unit) throw new HttpError(403, 'You are not in the class this unit belongs to')
 
   // Attach to the existing reflection, or open a draft to hold the file while
   // the student is still writing.
@@ -162,7 +162,7 @@ async function destroy(req, res, user) {
     throw new HttpError(403, 'Only the student who uploaded it can remove it')
   }
   if (['pending', 'approved'].includes(file.status)) {
-    throw new HttpError(409, 'You cannot change evidence once it is submitted')
+    throw new HttpError(409, 'This is already with your teacher, so the files are locked')
   }
 
   await q(`DELETE FROM evidence_files WHERE id = ?`, [id])

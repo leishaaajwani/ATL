@@ -71,12 +71,12 @@ export async function authenticate(req) {
   if (!user) {
     throw new HttpError(
       403,
-      'This account is not on the school roster. Ask your DP coordinator to add you.',
+      'We do not have this email on the school list yet. Ask your DP coordinator to add you.',
       'NOT_ON_ROSTER',
     )
   }
   if (user.status === 'disabled') {
-    throw new HttpError(403, 'This account has been disabled', 'DISABLED')
+    throw new HttpError(403, 'This account has been switched off. Speak to your coordinator.', 'DISABLED')
   }
 
   // First sign-in: bind the Google uid and activate.
@@ -161,7 +161,7 @@ export async function assertOwnsSection(userId, sectionId) {
     `SELECT id FROM sections WHERE id = ? AND teacher_id = ?`,
     [sectionId, userId],
   )
-  if (!row) throw new HttpError(403, 'That class is not yours')
+  if (!row) throw new HttpError(403, 'That is not one of your classes')
 }
 
 /** Throw unless this teacher owns the section the unit belongs to. */

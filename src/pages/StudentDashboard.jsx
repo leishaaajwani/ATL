@@ -46,7 +46,7 @@ export default function StudentDashboard() {
             <h1 className="page-title">
               Good {timeGreeting()}, {profile?.fullName?.split(' ')[0] ?? 'there'}
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">Your ATL skills across every unit</p>
+            <p className="text-sm text-slate-500 mt-0.5">How your ATL skills are coming along</p>
           </div>
           <Link to="/reflect"><button className="btn-accent"><PenLine size={15} /> New reflection</button></Link>
         </motion.div>
@@ -57,7 +57,7 @@ export default function StudentDashboard() {
             <div className="flex items-center gap-2 mb-3">
               <AlertCircle size={15} className="text-gold-700" />
               <p className="text-sm font-semibold text-navy-900">
-                {returned.length} {returned.length === 1 ? 'reflection needs' : 'reflections need'} revision
+                Your teacher sent {returned.length === 1 ? 'one back' : `${returned.length} back`}
               </p>
             </div>
             <div className="space-y-2">
@@ -97,9 +97,9 @@ export default function StudentDashboard() {
             <CardHeader title="Your units" subtitle={`${units.length} across your subjects`} />
             {units.length === 0 ? (
               <div className="py-10 text-center">
-                <p className="text-sm font-medium text-slate-700">Nothing here yet</p>
+                <p className="text-sm font-medium text-slate-700">Nothing to do yet</p>
                 <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                  Units appear once your teachers create them and your class enrolment is confirmed.
+                  Your units will show up here once your teachers have set them up.
                 </p>
               </div>
             ) : (
@@ -157,7 +157,7 @@ function TeacherRatings({ ratings }) {
 
   return (
     <Card>
-      <CardHeader title="What your teachers said" subtitle="From published term reports" />
+      <CardHeader title="What your teachers said" subtitle="From your published term reports" />
       <div className="space-y-4">
         {Object.entries(bySubject).map(([subject, list]) => {
           const byCategory = list.reduce((acc, r) => {

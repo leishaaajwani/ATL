@@ -97,13 +97,13 @@ export default function ReflectionEntry() {
     e.preventDefault()
     if (!unlocked) {
       return toast.error(needEvidence > 0
-        ? `${needEvidence} of your ticked sub-skills still needs an evidence note`
+        ? `${needEvidence} of your ticks still needs a note`
         : `Tick at least ${threshold} sub-skills first`)
     }
 
     for (const p of prompts) {
       const w = countWords(answers[p.id])
-      if (w < p.minWords) return toast.error(`"${p.question}" needs ${p.minWords} words, you have ${w}`)
+      if (w < p.minWords) return toast.error(`"${p.question}" needs ${p.minWords} words. You have ${w}.`)
     }
 
     setSaving(true)
@@ -117,7 +117,7 @@ export default function ReflectionEntry() {
         })),
         answers: prompts.map(p => ({ promptId: p.id, answerText: answers[p.id] ?? '' })),
       })
-      toast.success(existing?.status === 'returned' ? 'Revision sent for review' : 'Sent for review')
+      toast.success(existing?.status === 'returned' ? 'Sent back to your teacher' : 'Off to your teacher')
       navigate('/dashboard')
     } catch (err) {
       toast.error(err.message)
@@ -136,7 +136,7 @@ export default function ReflectionEntry() {
           <div>
             <h1 className="page-title">ATL Reflection</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Tick what you demonstrated, then reflect on it
+              Tick what you actually did, then tell us about it
             </p>
           </div>
         </div>
@@ -146,7 +146,7 @@ export default function ReflectionEntry() {
         {existing?.status === 'returned' && existing.teacherFeedback && (
           <div className="card p-4 mb-5 border-gold-200 bg-gold-50">
             <p className="text-xs font-semibold text-gold-800 uppercase tracking-wide mb-1">
-              Returned for revision
+Sent back to you
             </p>
             <p className="text-sm text-navy-900 leading-relaxed">{existing.teacherFeedback}</p>
           </div>
@@ -155,7 +155,9 @@ export default function ReflectionEntry() {
         {locked && (
           <div className="card p-4 mb-5 border-emerald-100 bg-emerald-50">
             <p className="text-sm text-emerald-800">
-              This reflection is {existing.status}. You cannot change it now.
+              {existing.status === 'approved'
+                ? 'Your teacher has approved this one. Nothing more to do.'
+                : 'This is with your teacher now. You will hear back soon.'}
             </p>
           </div>
         )}
@@ -175,8 +177,8 @@ export default function ReflectionEntry() {
             </select>
             {units.length === 0 && (
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                No units yet. Your teachers create these, and they appear here once
-                your class enrolment is confirmed.
+                Nothing to reflect on yet. Units show up here once your teacher
+                has set them up and confirmed you are in their class.
               </p>
             )}
           </div>
@@ -194,8 +196,8 @@ export default function ReflectionEntry() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                  Tick only the ones you can point to real evidence for. You need
-                  at least {threshold} before the reflection unlocks.
+                  Only tick the ones you could actually show someone. Pick {threshold}
+                  and the questions below open up.
                 </p>
 
                 <div className="space-y-2.5">
@@ -230,8 +232,8 @@ export default function ReflectionEntry() {
               {!unlocked ? (
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {checkedIds.length < threshold
-                    ? `Tick ${threshold - checkedIds.length} more sub-skill${threshold - checkedIds.length === 1 ? '' : 's'} to unlock these questions.`
-                    : `Add an evidence note to ${needEvidence} of the sub-skills you ticked. A tick without evidence does not count.`}
+                    ? `Pick ${threshold - checkedIds.length} more and these open up.`
+                    : `${needEvidence} of your ticks still needs a note. A tick on its own does not tell your teacher much.`}
                 </p>
               ) : (
                 <div className="space-y-5">
@@ -266,7 +268,7 @@ export default function ReflectionEntry() {
             <div className="flex justify-end gap-2">
               <button type="button" className="btn-ghost" onClick={() => navigate(-1)}>Cancel</button>
               <button className="btn-accent" disabled={saving || !unlocked}>
-                {saving ? 'Sending' : existing?.status === 'returned' ? 'Resubmit' : 'Send for review'}
+                {saving ? 'Sending' : existing?.status === 'returned' ? 'Send it back' : 'Send to teacher'}
               </button>
             </div>
           )}
@@ -312,12 +314,12 @@ function SubskillRow({ subskill, value, disabled, onToggle, onChange,
           </div>
           <input
             className="input-base !py-2 !text-xs" disabled={disabled}
-            placeholder="Where did you do this? Name the task or lesson."
+            placeholder="Which lesson or task? A few words is plenty."
             value={value.evidenceNote ?? ''}
             onChange={e => onChange({ evidenceNote: e.target.value })}
           />
           {value.evidenceNote && value.evidenceNote.trim().length < 10 && (
-            <p className="text-[11px] text-gold-700">A bit more detail, at least a few words.</p>
+            <p className="text-[11px] text-gold-700">A few more words, so your teacher knows where to look.</p>
           )}
           <EvidenceDropbox
             unitId={unitId}
@@ -335,10 +337,10 @@ function SubskillRow({ subskill, value, disabled, onToggle, onChange,
 // Mirrors db/seeds/001_reference.sql. The server validates against its own copy,
 // so a mismatch here fails loudly rather than silently accepting a short answer.
 const DEFAULT_PROMPTS = [
-  { id: 1, minWords: 40, question: 'Which sub-skill did you rely on most in this unit, and where specifically did you use it?',
-    helper: 'Name the task, lesson or assessment. Be concrete rather than general.' },
-  { id: 2, minWords: 50, question: 'Describe one moment in this unit where this skill was difficult. What did you actually do about it?',
-    helper: 'Describe the difficulty and your response, not just the outcome.' },
-  { id: 3, minWords: 30, question: 'What will you do differently in the next unit?',
-    helper: 'One specific change you intend to make, not a general aspiration.' },
+  { id: 1, minWords: 40, question: 'Which of these did you lean on most, and where?',
+    helper: 'Point to a real lesson or task. "Throughout the unit" is hard for your teacher to picture.' },
+  { id: 2, minWords: 50, question: 'When did it get difficult, and what did you do about it?',
+    helper: 'The bit you found hard is usually the bit worth writing about.' },
+  { id: 3, minWords: 30, question: 'What would you do differently next time?',
+    helper: 'One thing you will actually change, not "work harder".' },
 ]

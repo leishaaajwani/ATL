@@ -44,7 +44,7 @@ export default function Setup() {
           </h1>
           <p className="text-navy-200 text-sm mt-1.5 leading-relaxed">
             {isTeacher
-              ? 'Add each class you teach this year. Students will join these, and you confirm them.'
+              ? 'Add the classes you teach this year. Your students will pick theirs from these, and you confirm who is really in the room.'
               : 'Pick the classes you are in. Your teacher confirms each one before it becomes active.'}
           </p>
         </div>
@@ -117,7 +117,7 @@ function TeacherSetup({ sections, onChange }) {
         <EmptyState
           icon={BookOpen}
           title="No classes yet"
-          body="Add the first class you teach. You can add more at any time."
+          body="Start with one. You can add the rest whenever."
         />
       ) : (
         <div className="space-y-2">
@@ -171,7 +171,7 @@ function StudentSetup({ sections, onChange }) {
       <EmptyState
         icon={GraduationCap}
         title="No classes are available yet"
-        body="Your teachers have not set up their classes. Check back once they have."
+        body="Your teachers have not added their classes yet. Try again in a day or two."
       />
     )
   }
@@ -195,11 +195,11 @@ function StudentSetup({ sections, onChange }) {
                   <p className="text-xs text-slate-500 mt-0.5">{s.grade}</p>
                 </div>
                 {s.myStatus === 'active'  ? <span className="badge bg-emerald-50 text-emerald-700"><Check size={11} /> Confirmed</span>
-                : s.myStatus === 'pending' ? <span className="badge bg-gold-100 text-gold-800"><Clock size={11} /> Awaiting teacher</span>
+                : s.myStatus === 'pending' ? <span className="badge bg-gold-100 text-gold-800"><Clock size={11} /> Waiting on your teacher</span>
                 : s.myStatus === 'dropped' ? <span className="badge bg-slate-100 text-slate-500">Not in this class</span>
                 : <button className="btn-secondary !py-2 !px-4" disabled={busy === s.id}
                     onClick={() => join(s.id, `${subjectName} with ${s.teacherName}`)}>
-                    {busy === s.id ? 'Requesting' : 'This is my class'}
+                    {busy === s.id ? 'Requesting' : 'This one is mine'}
                   </button>}
               </div>
             ))}
