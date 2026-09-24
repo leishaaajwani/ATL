@@ -33,16 +33,14 @@ export default function Setup() {
   if (loading) return <PageLoader />
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-navy-900 text-white">
-        <div className="max-w-3xl mx-auto px-6 py-8">
-          <p className="text-gold-400 text-xs font-semibold tracking-widest uppercase mb-2">
-            GEMS Modern Academy
-          </p>
-          <h1 className="text-2xl font-semibold">
+    <div className="min-h-screen bg-[#f7f8fa]">
+      <header className="bg-navy-900 text-white border-b border-navy-950">
+        <div className="max-w-2xl mx-auto px-6 py-7">
+          <p className="eyebrow !text-navy-300 mb-2">GEMS Modern Academy</p>
+          <h1 className="text-[28px] font-semibold leading-tight tracking-tight">
             {isTeacher ? 'Set up your classes' : 'Choose your subjects'}
           </h1>
-          <p className="text-navy-200 text-sm mt-1.5 leading-relaxed">
+          <p className="text-navy-200 text-caption mt-1.5 leading-relaxed">
             {isTeacher
               ? 'Add each class you teach this year. Students will join these, and you confirm them.'
               : 'Pick the classes you are in. Your teacher confirms each one before it becomes active.'}
@@ -50,15 +48,15 @@ export default function Setup() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-8">
+      <main className="max-w-2xl mx-auto px-6 py-6">
         {isTeacher
           ? <TeacherSetup sections={sections} onChange={reload} />
           : <StudentSetup sections={sections} onChange={reload} />}
 
         {((isTeacher && sections.length > 0) ||
           (!isTeacher && sections.some(s => s.myStatus))) && (
-          <div className="mt-8 flex justify-end">
-            <button className="btn-accent" onClick={() => navigate(homeFor(profile?.role))}>
+          <div className="mt-6 flex justify-end">
+            <button className="btn-primary" onClick={() => navigate(homeFor(profile?.role))}>
               Continue to dashboard
             </button>
           </div>
@@ -95,9 +93,9 @@ function TeacherSetup({ sections, onChange }) {
   }
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={add} className="card p-5">
-        <h2 className="text-sm font-semibold text-slate-800 mb-4">Add a class</h2>
+    <div className="space-y-5">
+      <form onSubmit={add} className="card p-4">
+        <h2 className="text-caption font-semibold text-slate-800 mb-4">Add a class</h2>
         <div className="grid sm:grid-cols-[1fr_auto_auto] gap-3">
           <select className="input-base" value={subject} onChange={e => setSubject(e.target.value)}>
             <option value="">Select subject</option>
@@ -121,22 +119,22 @@ function TeacherSetup({ sections, onChange }) {
         />
       ) : (
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-slate-800 px-1">
+          <h2 className="text-caption font-semibold text-slate-800 px-1">
             Your classes ({sections.length})
           </h2>
           {sections.map(s => (
             <motion.div key={s.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
               className="card p-4 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-900">{s.subjectName}</p>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-caption font-medium text-slate-900">{s.subjectName}</p>
+                <p className="text-caption text-slate-500 mt-0.5">
                   {s.grade}
                   {s.activeStudents > 0 && ` · ${s.activeStudents} student${s.activeStudents === 1 ? '' : 's'}`}
                   {s.pendingStudents > 0 && ` · ${s.pendingStudents} awaiting confirmation`}
                 </p>
               </div>
               {s.pendingStudents > 0
-                ? <span className="badge bg-gold-100 text-gold-800">
+                ? <span className="badge-waiting">
                     <Clock size={11} /> {s.pendingStudents} to confirm
                   </span>
                 : <Check size={16} className="text-emerald-500" />}
@@ -186,17 +184,17 @@ function StudentSetup({ sections, onChange }) {
     <div className="space-y-5">
       {Object.entries(bySubject).map(([subjectName, list]) => (
         <div key={subjectName}>
-          <h2 className="text-sm font-semibold text-slate-800 mb-2 px-1">{subjectName}</h2>
+          <h2 className="text-caption font-semibold text-slate-800 mb-2 px-1">{subjectName}</h2>
           <div className="space-y-2">
             {list.map(s => (
               <div key={s.id} className="card p-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{s.teacherName}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{s.grade}</p>
+                  <p className="text-caption font-medium text-slate-900 truncate">{s.teacherName}</p>
+                  <p className="text-caption text-slate-500 mt-0.5">{s.grade}</p>
                 </div>
-                {s.myStatus === 'active'  ? <span className="badge bg-emerald-50 text-emerald-700"><Check size={11} /> Confirmed</span>
-                : s.myStatus === 'pending' ? <span className="badge bg-gold-100 text-gold-800"><Clock size={11} /> Awaiting teacher</span>
-                : s.myStatus === 'dropped' ? <span className="badge bg-slate-100 text-slate-500">Not in this class</span>
+                {s.myStatus === 'active'  ? <span className="badge-positive"><Check size={11} /> Confirmed</span>
+                : s.myStatus === 'pending' ? <span className="badge-waiting"><Clock size={11} /> Awaiting teacher</span>
+                : s.myStatus === 'dropped' ? <span className="badge-neutral">Not in this class</span>
                 : <button className="btn-secondary !py-2 !px-4" disabled={busy === s.id}
                     onClick={() => join(s.id, `${subjectName} with ${s.teacherName}`)}>
                     {busy === s.id ? 'Requesting' : 'This is my class'}
@@ -212,12 +210,12 @@ function StudentSetup({ sections, onChange }) {
 
 function EmptyState({ icon: Icon, title, body }) {
   return (
-    <div className="card p-10 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-navy-50 flex items-center justify-center mx-auto mb-3">
+    <div className="card px-5 py-8 text-center">
+      <div className="w-12 h-12 rounded-card bg-navy-50 flex items-center justify-center mx-auto mb-3">
         <Icon size={20} className="text-navy-700" />
       </div>
-      <p className="text-sm font-medium text-slate-800">{title}</p>
-      <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">{body}</p>
+      <p className="text-caption font-medium text-slate-800">{title}</p>
+      <p className="text-caption text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">{body}</p>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { EvidenceList } from '../components/EvidenceDropbox'
 import PageLayout from '../components/layout/PageLayout'
 import Modal from '../components/ui/Modal'
 import { PageLoader } from '../components/ui/LoadingSpinner'
+import SegmentedControl from '../components/ui/SegmentedControl'
 import { formatDateTime } from '../utils/helpers'
 import toast from 'react-hot-toast'
 
@@ -30,26 +31,24 @@ export default function ApprovalReview() {
       <div className="space-y-5">
         <div>
           <h1 className="page-title">Approvals</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="page-subtitle">
             Review what students claim they demonstrated, then approve or send it back
           </p>
         </div>
 
-        <div className="flex gap-2">
-          {[['pending', 'Awaiting review'], ['returned', 'Returned'], ['approved', 'Approved']].map(([k, label]) => (
-            <button key={k} onClick={() => setTab(k)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                tab === k ? 'bg-navy-900 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
-              }`}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          options={[
+            { value: 'pending',  label: 'Awaiting review' },
+            { value: 'returned', label: 'Returned' },
+            { value: 'approved', label: 'Approved' },
+          ]}
+          value={tab} onChange={setTab}
+        />
 
         {loading ? <PageLoader /> : items.length === 0 ? (
-          <div className="card p-12 text-center">
+          <div className="card px-5 py-10 text-center">
             <CheckCircle2 size={28} className="text-emerald-500 mx-auto mb-3" />
-            <p className="text-sm font-medium text-slate-800">
+            <p className="text-caption font-medium text-slate-800">
               {tab === 'pending' ? 'Nothing waiting on you' : `No ${tab} reflections`}
             </p>
           </div>
@@ -101,8 +100,8 @@ function ReflectionCard({ reflection: r, onDone }) {
   return (
     <>
       <div className="card overflow-hidden">
-        <button onClick={() => setOpen(o => !o)} className="w-full text-left p-5 flex items-start gap-4">
-          <div className="w-9 h-9 rounded-xl bg-navy-100 flex items-center justify-center shrink-0 text-navy-800 text-sm font-semibold">
+        <button onClick={() => setOpen(o => !o)} className="w-full text-left p-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-control bg-navy-100 flex items-center justify-center shrink-0 text-navy-800 text-sm font-semibold">
             {r.studentName?.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
@@ -111,12 +110,12 @@ function ReflectionCard({ reflection: r, onDone }) {
               <span className="text-slate-300">·</span>
               <span className="text-sm text-slate-600">{r.subjectName}</span>
               {r.revisionCount > 0 && (
-                <span className="badge bg-gold-100 text-gold-800">
+                <span className="badge-waiting">
                   Revision {r.revisionCount}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-caption text-slate-500">
               {r.term} · {r.name ?? r.unitName} · {formatDateTime(r.submittedAt)}
             </p>
             <div className="flex flex-wrap gap-1 mt-2">
@@ -143,7 +142,7 @@ function ReflectionCard({ reflection: r, onDone }) {
                   </p>
                   <div className="space-y-2">
                     {r.ticks?.map(t => (
-                      <div key={t.subskillId} className="rounded-xl bg-slate-50 p-3">
+                      <div key={t.subskillId} className="rounded-control bg-slate-50 p-3">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-xs font-medium text-slate-800">
                             {t.subskillName}
@@ -170,7 +169,7 @@ function ReflectionCard({ reflection: r, onDone }) {
                   {r.answers?.map(a => (
                     <div key={a.sequence}>
                       <p className="text-xs font-medium text-slate-700 mb-1">{a.question}</p>
-                      <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-xl">
+                      <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-control">
                         {a.answerText}
                       </p>
                       <p className="text-[10px] text-slate-400 mt-1">{a.wordCount} words</p>
@@ -182,7 +181,7 @@ function ReflectionCard({ reflection: r, onDone }) {
                   label="Evidence for the whole unit" />
 
                 {r.teacherFeedback && (
-                  <div className="rounded-xl bg-navy-50 p-3">
+                  <div className="rounded-control bg-navy-50 p-3">
                     <p className="text-xs font-semibold text-navy-800 mb-1">Your previous feedback</p>
                     <p className="text-sm text-navy-900 leading-relaxed">{r.teacherFeedback}</p>
                   </div>
@@ -193,7 +192,7 @@ function ReflectionCard({ reflection: r, onDone }) {
                     <button className="btn-secondary" onClick={() => { setModal('return'); setFb('') }}>
                       <RotateCcw size={13} /> Send back
                     </button>
-                    <button className="btn-accent" onClick={() => { setModal('approve'); setFb('') }}>
+                    <button className="btn-primary" onClick={() => { setModal('approve'); setFb('') }}>
                       <CheckCircle2 size={13} /> Approve
                     </button>
                   </div>
@@ -219,7 +218,7 @@ function ReflectionCard({ reflection: r, onDone }) {
               : 'What should they change? This is required.'} />
           <div className="flex justify-end gap-2">
             <button className="btn-ghost" onClick={() => setModal(null)}>Cancel</button>
-            <button className="btn-accent" disabled={busy || (modal === 'return' && !feedback.trim())}
+            <button className="btn-primary" disabled={busy || (modal === 'return' && !feedback.trim())}
               onClick={submit}>
               {busy ? 'Saving' : modal === 'approve' ? 'Approve' : 'Send back'}
             </button>

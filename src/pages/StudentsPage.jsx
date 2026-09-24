@@ -41,8 +41,8 @@ export default function StudentsPage() {
   if (!sections.length) {
     return (
       <PageLayout>
-        <div className="card p-10 text-center max-w-md mx-auto">
-          <p className="text-sm font-medium text-slate-800">No classes yet</p>
+        <div className="card px-5 py-8 text-center max-w-md mx-auto">
+          <p className="text-caption font-medium text-slate-800">No classes yet</p>
           <Link to="/setup"><button className="btn-primary mt-4">Set up classes</button></Link>
         </div>
       </PageLayout>
@@ -58,7 +58,7 @@ export default function StudentsPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="page-title">Students</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="page-subtitle">
               Confirm who is actually in your class
             </p>
           </div>
@@ -83,10 +83,10 @@ export default function StudentsPage() {
                 <div className="space-y-2">
                   {pending.map(s => (
                     <motion.div key={s.enrollmentId} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                      className="bg-white rounded-xl p-3 border border-gold-200/60 flex items-center justify-between gap-3 flex-wrap">
+                      className="bg-white rounded-control p-3 border border-gold-200/60 flex items-center justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900">{s.fullName}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{s.email}</p>
+                        <p className="text-caption font-medium text-slate-900">{s.fullName}</p>
+                        <p className="text-caption text-slate-500 mt-0.5">{s.email}</p>
                       </div>
                       <div className="flex gap-1.5 shrink-0">
                         <button className="p-2 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
@@ -105,9 +105,9 @@ export default function StudentsPage() {
             )}
 
             {active.length === 0 ? (
-              <div className="card p-10 text-center">
-                <p className="text-sm font-medium text-slate-800">No confirmed students</p>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+              <div className="card px-5 py-8 text-center">
+                <p className="text-caption font-medium text-slate-800">No confirmed students</p>
+                <p className="text-caption text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
                   Students pick their own classes during setup, and appear here for you to confirm.
                 </p>
               </div>
@@ -128,16 +128,16 @@ export default function StudentsPage() {
                         <tr key={s.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors">
                           <td className="py-3 px-4">
                             <p className="font-medium text-slate-900">{s.fullName}</p>
-                            <p className="text-xs text-slate-500">{s.email}</p>
+                            <p className="text-caption text-slate-500">{s.email}</p>
                           </td>
                           <td className="py-3 px-4 text-center text-emerald-600 font-medium">{s.approvedCount}</td>
                           <td className="py-3 px-4 text-center">
                             {s.pendingCount > 0
-                              ? <span className="badge bg-gold-100 text-gold-800">{s.pendingCount}</span>
+                              ? <span className="badge-waiting">{s.pendingCount}</span>
                               : <span className="text-slate-300">0</span>}
                           </td>
                           <td className="py-3 px-4 text-right">
-                            <button className="text-xs text-slate-400 hover:text-rose-600 transition-colors"
+                            <button className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors"
                               onClick={() => decide(s.enrollmentId, 'drop')}>
                               Remove
                             </button>

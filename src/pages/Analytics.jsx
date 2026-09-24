@@ -4,6 +4,7 @@ import { getMyUnits, getRatings, getRoster } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
 import Card, { CardHeader } from '../components/ui/Card'
 import { PageLoader } from '../components/ui/LoadingSpinner'
+import SegmentedControl from '../components/ui/SegmentedControl'
 import { SCORE_MAP } from '../utils/atlFramework'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -59,10 +60,10 @@ function StudentAnalytics() {
 
   return (
     <PageLayout>
-      <div className="space-y-6">
+      <div className="space-y-5">
         <div>
           <h1 className="page-title">Your ATL progress</h1>
-          <p className="text-sm text-slate-500 mt-0.5">How your skills are developing across units</p>
+          <p className="page-subtitle">How your skills are developing across units</p>
         </div>
 
         {subjects.length > 1 && (
@@ -76,9 +77,9 @@ function StudentAnalytics() {
         )}
 
         {ratings.length === 0 ? (
-          <div className="card p-12 text-center">
-            <p className="text-sm font-medium text-slate-800">No teacher ratings yet</p>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+          <div className="card px-5 py-10 text-center">
+            <p className="text-caption font-medium text-slate-800">No teacher ratings yet</p>
+            <p className="text-caption text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
               Your teachers publish these at the end of each term. Once they do, you will
               see how their view compares with your own.
             </p>
@@ -201,8 +202,8 @@ function TeacherAnalytics({ profile }) {
   if (!sections.length) {
     return (
       <PageLayout>
-        <div className="card p-10 text-center max-w-md mx-auto">
-          <p className="text-sm font-medium text-slate-800">No classes yet</p>
+        <div className="card px-5 py-8 text-center max-w-md mx-auto">
+          <p className="text-caption font-medium text-slate-800">No classes yet</p>
         </div>
       </PageLayout>
     )
@@ -210,10 +211,10 @@ function TeacherAnalytics({ profile }) {
 
   return (
     <PageLayout>
-      <div className="space-y-6">
+      <div className="space-y-5">
         <div>
           <h1 className="page-title">Class analytics</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Where your class is strong, and where it is not</p>
+          <p className="page-subtitle">Where your class is strong, and where it is not</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -223,22 +224,13 @@ function TeacherAnalytics({ profile }) {
               <option key={s.id} value={s.id}>{s.subjectName} · {s.grade}</option>
             ))}
           </select>
-          <div className="flex gap-1.5">
-            {['Term 1', 'Term 2', 'Term 3'].map(t => (
-              <button key={t} onClick={() => setTerm(t)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                  term === t ? 'bg-navy-900 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
-                }`}>
-                {t}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl options={['Term 1', 'Term 2', 'Term 3']} value={term} onChange={setTerm} />
         </div>
 
         {loading ? <PageLoader /> : byCategory.length === 0 ? (
-          <div className="card p-12 text-center">
-            <p className="text-sm font-medium text-slate-800">Nothing rated in {term} yet</p>
-            <p className="text-xs text-slate-500 mt-1">Rate students in Reports and this fills in.</p>
+          <div className="card px-5 py-10 text-center">
+            <p className="text-caption font-medium text-slate-800">Nothing rated in {term} yet</p>
+            <p className="text-caption text-slate-500 mt-1">Rate students in Reports and this fills in.</p>
           </div>
         ) : (
           <>
@@ -265,7 +257,7 @@ function TeacherAnalytics({ profile }) {
                   subtitle="Where a conversation would be most useful" />
                 <div className="space-y-1.5">
                   {gaps.map((g, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-50">
+                    <div key={i} className="flex items-center justify-between gap-3 p-2.5 rounded-control bg-slate-50">
                       <div className="min-w-0">
                         <p className="text-xs font-medium text-slate-800 truncate">{g.student}</p>
                         <p className="text-[11px] text-slate-500 truncate">{g.unit} · {g.name}</p>
