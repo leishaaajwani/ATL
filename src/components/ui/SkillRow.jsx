@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react'
+import { categoryTint } from '../../utils/categoryTint'
 
 // One ATL sub-skill as a dense list row: checkbox, title, category badge right.
 //
@@ -6,21 +7,6 @@ import { Check } from 'lucide-react'
 // around fifteen sub-skills, and fifteen cards is a scroll; fifteen rows is a
 // list you can read in one pass. The separator is a hairline, so the set reads
 // as a single table rather than as competing objects.
-
-const CATEGORY_TINT = {
-  Thinking:          { bg: '#eef2fb', fg: '#2c4a86' },
-  Communication:     { bg: '#faf3e6', fg: '#8a661a' },
-  Research:          { bg: '#eef4fb', fg: '#33608f' },
-  Social:            { bg: '#ecf5f1', fg: '#2f6b57' },
-  'Self-management': { bg: '#f7f1ea', fg: '#7b5730' },
-}
-
-// The database ships vivid category colours for charts. Badges need a quieter
-// register, so map to a muted pair here rather than desaturating at source and
-// losing the chart contrast.
-export function categoryTint(name) {
-  return CATEGORY_TINT[name] ?? { bg: '#f1f5f9', fg: '#475569' }
-}
 
 export default function SkillRow({
   name, categoryName, descriptor, subjectSpecific,
