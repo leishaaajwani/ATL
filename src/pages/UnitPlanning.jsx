@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus } from 'lucide-react'
+import { Plus, Check, Sparkles } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getUnits, createUnit, getSubskills } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
 import { PageLoader } from '../components/ui/LoadingSpinner'
-import SkillRow from '../components/ui/SkillRow'
 import toast from 'react-hot-toast'
 
 const TERMS = ['Term 1', 'Term 2', 'Term 3']
@@ -46,9 +45,9 @@ export default function UnitPlanning() {
   if (!sections.length) {
     return (
       <PageLayout>
-        <div className="card px-5 py-8 text-center max-w-md mx-auto">
-          <p className="text-caption font-medium text-slate-800">No classes yet</p>
-          <p className="text-caption text-slate-500 mt-1">Add the classes you teach before planning units.</p>
+        <div className="card p-10 text-center max-w-md mx-auto">
+          <p className="text-sm font-medium text-slate-800">No classes yet</p>
+          <p className="text-xs text-slate-500 mt-1">Add the classes you teach before planning units.</p>
           <a href="/setup" className="btn-primary mt-4 inline-flex">Set up classes</a>
         </div>
       </PageLayout>
@@ -57,11 +56,11 @@ export default function UnitPlanning() {
 
   return (
     <PageLayout>
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="page-title">Unit Planning</h1>
-            <p className="page-subtitle">
+            <p className="text-sm text-slate-500 mt-0.5">
               Tag the ATL sub-skills each unit actually develops
             </p>
           </div>
@@ -73,7 +72,7 @@ export default function UnitPlanning() {
           </select>
         </div>
 
-        <button className="btn-primary" onClick={() => setCreating(c => !c)}>
+        <button className="btn-accent" onClick={() => setCreating(c => !c)}>
           <Plus size={15} /> New unit
         </button>
 
@@ -138,7 +137,7 @@ function NewUnitForm({ sectionId, subjectName, grade, catalogue, onDone }) {
   }
 
   return (
-    <form onSubmit={save} className="card p-4 space-y-5">
+    <form onSubmit={save} className="card p-5 space-y-5">
       <div className="grid sm:grid-cols-[1fr_auto] gap-3">
         <input className="input-base" placeholder="Unit name, e.g. Linear Programming"
           value={name} onChange={e => setName(e.target.value)} />
@@ -149,33 +148,45 @@ function NewUnitForm({ sectionId, subjectName, grade, catalogue, onDone }) {
 
       <div>
         <div className="flex items-baseline justify-between mb-1">
-          <h3 className="text-caption font-semibold text-slate-800">ATL sub-skills for this unit</h3>
-          <span className="text-[11px] text-slate-400">{picked.size} tagged</span>
+          <h3 className="text-sm font-semibold text-slate-800">ATL sub-skills for this unit</h3>
+          <span className="text-xs text-slate-400">{picked.size} tagged</span>
         </div>
-        <p className="text-caption text-slate-500 mb-4 leading-relaxed">
+        <p className="text-xs text-slate-500 mb-4 leading-relaxed">
           Showing {grade?.startsWith('MYP') ? 'MYP' : 'DP'} sub-skills for {subjectName}.
           The marked ones are written for this subject specifically. Students see
           only what you tick, so leave out anything this unit does not genuinely develop.
         </p>
 
-        <div className="rounded-control border border-hairline overflow-hidden">
-          {catalogue.flatMap(cat => cat.subskills.map(ss => (
-            <SkillRow
-              key={ss.id}
-              name={ss.name}
-              descriptor={ss.descriptor}
-              categoryName={cat.categoryName}
-              subjectSpecific={ss.isSubjectSpecific}
-              checked={picked.has(ss.id)}
-              onToggle={() => toggle(ss.id)}
-              trailing={ss.isSubjectSpecific
-                ? <span className="shrink-0 text-[10px] font-medium text-gold-700
-                                   px-1.5 py-0.5 rounded bg-gold-50">
-                    {subjectName.split(' ')[0]}
-                  </span>
-                : null}
-            />
-          )))}
+        <div className="space-y-4">
+          {catalogue.map(cat => (
+            <div key={cat.categoryId}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide mb-2"
+                style={{ color: cat.colour }}>
+                {cat.categoryName}
+              </p>
+              <div className="grid sm:grid-cols-2 gap-1.5">
+                {cat.subskills.map(ss => {
+                  const on = picked.has(ss.id)
+                  return (
+                    <button key={ss.id} type="button" onClick={() => toggle(ss.id)}
+                      className={`flex items-start gap-2 p-2.5 rounded-lg border text-left transition-colors
+                        ${on ? 'border-navy-300 bg-navy-50' : 'border-slate-100 hover:border-slate-200'}`}>
+                      <span className={`mt-0.5 w-4 h-4 rounded shrink-0 border flex items-center justify-center
+                        ${on ? 'bg-navy-700 border-navy-700' : 'border-slate-300 bg-white'}`}>
+                        {on && <Check size={11} className="text-white" strokeWidth={3} />}
+                      </span>
+                      <span className="text-xs text-slate-700 leading-snug">
+                        {ss.name}
+                        {ss.isSubjectSpecific && (
+                          <Sparkles size={10} className="inline ml-1 -mt-0.5 text-gold-600" />
+                        )}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -188,7 +199,7 @@ function NewUnitForm({ sectionId, subjectName, grade, catalogue, onDone }) {
           </select>
           before reflecting
         </label>
-        <button className="btn-primary" disabled={saving}>
+        <button className="btn-accent" disabled={saving}>
           {saving ? 'Creating' : 'Create unit'}
         </button>
       </div>
@@ -199,9 +210,9 @@ function NewUnitForm({ sectionId, subjectName, grade, catalogue, onDone }) {
 function UnitList({ units }) {
   if (!units.length) {
     return (
-      <div className="card px-5 py-8 text-center">
-        <p className="text-caption font-medium text-slate-800">No units in this class yet</p>
-        <p className="text-caption text-slate-500 mt-1">Create one so students have something to reflect on.</p>
+      <div className="card p-10 text-center">
+        <p className="text-sm font-medium text-slate-800">No units in this class yet</p>
+        <p className="text-xs text-slate-500 mt-1">Create one so students have something to reflect on.</p>
       </div>
     )
   }
@@ -209,7 +220,7 @@ function UnitList({ units }) {
   const byTerm = TERMS.map(t => [t, units.filter(u => u.term === t)]).filter(([, l]) => l.length)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {byTerm.map(([term, list]) => (
         <div key={term}>
           <h2 className="section-title mb-3">{term}</h2>
@@ -218,8 +229,8 @@ function UnitList({ units }) {
               <div key={u.id} className="card p-4">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div>
-                    <p className="text-caption font-medium text-slate-900">{u.name}</p>
-                    <p className="text-caption text-slate-500 mt-0.5">
+                    <p className="text-sm font-medium text-slate-900">{u.name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
                       {u.subskills?.length ?? 0} sub-skills · needs {u.minSubskills} ticked
                     </p>
                   </div>

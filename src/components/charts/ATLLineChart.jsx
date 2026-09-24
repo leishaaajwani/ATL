@@ -1,29 +1,44 @@
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  Legend, ResponsiveContainer,
 } from 'recharts'
-import { ChartEmpty } from './ChartContainer'
-import { LEVEL_TICK, LEVEL_NAME, AXIS, GRID, TOOLTIP, SERIES } from './chartTheme'
+import { ATL_CATEGORIES, ATL_CATEGORY_KEYS } from '../../utils/atlFramework'
 
-// Progression across terms. Each line is one ATL category.
-export default function ATLLineChart({ data, height = 260 }) {
-  if (!data?.length) return <ChartEmpty message="Needs more than one term of data" />
-
-  const categories = [...new Set(data.flatMap(d => Object.keys(d)))].filter(k => k !== 'term')
+export default function ATLLineChart({ data }) {
+  if (!data?.length) return <EmptyState />
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
-        <CartesianGrid stroke={GRID} vertical={false} />
-        <XAxis dataKey="term" tick={AXIS} axisLine={false} tickLine={false} />
-        <YAxis domain={[0, 4]} ticks={[1, 2, 3, 4]} width={26} axisLine={false} tickLine={false}
-          tickFormatter={v => LEVEL_TICK[v] ?? ''} tick={AXIS} />
-        <Tooltip {...TOOLTIP} formatter={v => LEVEL_NAME[Math.round(v)] ?? v} />
-        <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} iconType="plainline" iconSize={12} />
-        {categories.map((cat, i) => (
-          <Line key={cat} type="monotone" dataKey={cat} stroke={SERIES[i % SERIES.length]}
-            strokeWidth={1.5} dot={{ r: 2.5, strokeWidth: 0 }} activeDot={{ r: 4 }} />
+    <ResponsiveContainer width="100%" height={300}>
+      <LineChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis dataKey="term" tick={{ fontSize: 12, fill: '#64748b' }} />
+        <YAxis domain={[0, 4]} tickCount={5} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+        <Tooltip
+          formatter={(value, name) => [value ? value.toFixed(2) : '—', name]}
+          contentStyle={{ borderRadius: 12, border: '1px solid #f1f5f9', fontSize: 12 }}
+        />
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+        {ATL_CATEGORY_KEYS.map(cat => (
+          <Line
+            key={cat}
+            type="monotone"
+            dataKey={cat}
+            stroke={ATL_CATEGORIES[cat].color}
+            strokeWidth={2}
+            dot={{ r: 4, strokeWidth: 2 }}
+            activeDot={{ r: 5 }}
+            connectNulls
+          />
         ))}
       </LineChart>
     </ResponsiveContainer>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className="h-64 flex items-center justify-center text-slate-400 text-sm">
+      No data to display yet.
+    </div>
   )
 }

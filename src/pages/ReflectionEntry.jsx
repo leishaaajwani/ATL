@@ -1,14 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Lock, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Check, Lock, CheckCircle2 } from 'lucide-react'
 import { getMyUnits, getMyReflection, submitReflection, listEvidence } from '../api/client'
 import EvidenceDropbox from '../components/EvidenceDropbox'
 import { PageLoader } from '../components/ui/LoadingSpinner'
 import PageLayout from '../components/layout/PageLayout'
 import { ASSESSMENT_LEVELS } from '../utils/atlFramework'
-import SkillRow from '../components/ui/SkillRow'
-import SegmentedControl from '../components/ui/SegmentedControl'
 import toast from 'react-hot-toast'
 
 // Two stages, in this order, because that is the rule the teachers set:
@@ -133,38 +131,38 @@ export default function ReflectionEntry() {
   return (
     <PageLayout>
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-2 mb-5">
-          <button onClick={() => navigate(-1)}
-            className="p-1.5 -ml-1.5 rounded-md text-slate-400 hover:text-slate-700
-                       hover:bg-slate-100 transition-colors duration-200">
-            <ArrowLeft size={16} />
-          </button>
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => navigate(-1)} className="btn-ghost p-2"><ArrowLeft size={16} /></button>
           <div>
             <h1 className="page-title">ATL Reflection</h1>
-            <p className="page-subtitle">Tick what you demonstrated, then reflect on it</p>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Tick what you demonstrated, then reflect on it
+            </p>
           </div>
         </div>
 
         {/* Returned feedback sits above everything, because it is the reason
             the student is back on this page. */}
         {existing?.status === 'returned' && existing.teacherFeedback && (
-          <div className="card mb-4 border-l-2 border-l-gold-500 px-4 py-3">
-            <p className="eyebrow mb-1">Returned for revision</p>
-            <p className="text-caption text-navy-900 leading-relaxed">{existing.teacherFeedback}</p>
+          <div className="card p-4 mb-5 border-gold-200 bg-gold-50">
+            <p className="text-xs font-semibold text-gold-800 uppercase tracking-wide mb-1">
+              Returned for revision
+            </p>
+            <p className="text-sm text-navy-900 leading-relaxed">{existing.teacherFeedback}</p>
           </div>
         )}
 
         {locked && (
-          <div className="card mb-4 border-l-2 border-l-emerald-500 px-4 py-3">
-            <p className="text-caption text-slate-700">
+          <div className="card p-4 mb-5 border-emerald-100 bg-emerald-50">
+            <p className="text-sm text-emerald-800">
               This reflection is {existing.status}. You cannot change it now.
             </p>
           </div>
         )}
 
-        <form onSubmit={submit} className="space-y-4">
-          <div className="card px-4 py-3.5">
-            <label className="label">Unit</label>
+        <form onSubmit={submit} className="space-y-5">
+          <div className="card p-5">
+            <label className="text-xs font-medium text-slate-600 block mb-1.5">Unit</label>
             <select className="input-base" value={unitId} disabled={locked}
               onChange={e => setUnitId(e.target.value)}>
               <option value="">Select a unit</option>
@@ -176,7 +174,7 @@ export default function ReflectionEntry() {
               ))}
             </select>
             {units.length === 0 && (
-              <p className="text-caption text-slate-500 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 No units yet. Your teachers create these, and they appear here once
                 your class enrolment is confirmed.
               </p>
@@ -185,25 +183,22 @@ export default function ReflectionEntry() {
 
           <AnimatePresence>
             {unit && (
-              <motion.section initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                className="card overflow-hidden">
-                <header className="px-4 py-3 border-b border-hairline">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <h2 className="text-section font-semibold text-navy-900 leading-tight">
-                      Which of these did you actually do?
-                    </h2>
-                    <span className={`text-caption font-medium tabular-nums
-                      ${unlocked ? 'text-emerald-600' : 'text-slate-400'}`}>
-                      {checkedIds.length} / {threshold}
-                    </span>
-                  </div>
-                  <p className="text-caption text-slate-500 mt-1 leading-relaxed">
-                    Tick only the ones you can point to real evidence for.
-                  </p>
-                </header>
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                className="card p-5">
+                <div className="flex items-baseline justify-between mb-1">
+                  <h2 className="text-sm font-semibold text-slate-800">
+                    Which of these did you actually do?
+                  </h2>
+                  <span className={`text-xs font-semibold ${unlocked ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {checkedIds.length} / {threshold}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                  Tick only the ones you can point to real evidence for. You need
+                  at least {threshold} before the reflection unlocks.
+                </p>
 
-                <div>
+                <div className="space-y-2.5">
                   {unit.subskills?.map(ss => (
                     <SubskillRow
                       key={ss.id}
@@ -218,49 +213,44 @@ export default function ReflectionEntry() {
                     />
                   ))}
                 </div>
-              </motion.section>
+              </motion.div>
             )}
           </AnimatePresence>
 
           {/* Prompts, gated */}
           {unit && (
-            <section className={`card overflow-hidden transition-opacity duration-200
-                                 ${unlocked ? '' : 'opacity-70'}`}>
-              <header className="flex items-center gap-2 px-4 py-3 border-b border-hairline">
+            <div className={`card p-5 transition-opacity ${unlocked ? '' : 'opacity-60'}`}>
+              <div className="flex items-center gap-2 mb-4">
                 {unlocked
-                  ? <CheckCircle2 size={14} className="text-emerald-600" />
-                  : <Lock size={14} className="text-slate-400" />}
-                <h2 className="text-section font-semibold text-navy-900 leading-tight">
-                  Your reflection
-                </h2>
-              </header>
+                  ? <CheckCircle2 size={15} className="text-emerald-500" />
+                  : <Lock size={15} className="text-slate-400" />}
+                <h2 className="text-sm font-semibold text-slate-800">Your reflection</h2>
+              </div>
 
-              <div className="px-4 py-3.5">
               {!unlocked ? (
-                <p className="text-caption text-slate-500 leading-relaxed">
+                <p className="text-xs text-slate-500 leading-relaxed">
                   {checkedIds.length < threshold
                     ? `Tick ${threshold - checkedIds.length} more sub-skill${threshold - checkedIds.length === 1 ? '' : 's'} to unlock these questions.`
                     : `Add an evidence note to ${needEvidence} of the sub-skills you ticked. A tick without evidence does not count.`}
                 </p>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {prompts.map(p => {
                     const words = countWords(answers[p.id])
                     const done  = words >= p.minWords
                     return (
                       <div key={p.id}>
-                        <div className="flex items-baseline justify-between gap-3 mb-1">
-                          <label className="text-caption font-medium text-slate-800 leading-snug">
+                        <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                          <label className="text-sm font-medium text-slate-800 leading-snug">
                             {p.question}
                           </label>
-                          <span className={`text-[11px] shrink-0 tabular-nums
-                            ${done ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          <span className={`text-xs shrink-0 font-medium ${done ? 'text-emerald-600' : 'text-slate-400'}`}>
                             {words}/{p.minWords}
                           </span>
                         </div>
-                        {p.helper && <p className="text-[11px] text-slate-500 mb-1.5">{p.helper}</p>}
+                        {p.helper && <p className="text-xs text-slate-500 mb-2">{p.helper}</p>}
                         <textarea
-                          className="input-base resize-none leading-relaxed" rows={3} disabled={locked}
+                          className="input-base resize-none" rows={4} disabled={locked}
                           value={answers[p.id] ?? ''}
                           onChange={e => setAnswers(a => ({ ...a, [p.id]: e.target.value }))}
                         />
@@ -269,14 +259,13 @@ export default function ReflectionEntry() {
                   })}
                 </div>
               )}
-              </div>
-            </section>
+            </div>
           )}
 
           {unit && !locked && (
-            <div className="flex justify-end gap-2 pt-1">
+            <div className="flex justify-end gap-2">
               <button type="button" className="btn-ghost" onClick={() => navigate(-1)}>Cancel</button>
-              <button className="btn-primary" disabled={saving || !unlocked}>
+              <button className="btn-accent" disabled={saving || !unlocked}>
                 {saving ? 'Sending' : existing?.status === 'returned' ? 'Resubmit' : 'Send for review'}
               </button>
             </div>
@@ -290,52 +279,56 @@ export default function ReflectionEntry() {
 function SubskillRow({ subskill, value, disabled, onToggle, onChange,
                       unitId, evidence, onEvidenceChange }) {
   const on = Boolean(value)
-
   return (
-    <SkillRow
-      name={subskill.name}
-      descriptor={on ? null : subskill.descriptor}
-      categoryName={subskill.categoryName}
-      subjectSpecific={subskill.isSubjectSpecific}
-      checked={on}
-      onToggle={onToggle}
-      disabled={disabled}
-    >
+    <div className={`rounded-xl border transition-colors ${on ? 'border-navy-200 bg-navy-50/40' : 'border-slate-100'}`}>
+      <button type="button" onClick={onToggle} disabled={disabled}
+        className="w-full flex items-start gap-3 p-3 text-left">
+        <span className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-colors
+          ${on ? 'bg-navy-700 border-navy-700' : 'border-slate-300 bg-white'}`}>
+          {on && <Check size={11} className="text-white" strokeWidth={3} />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="text-sm text-slate-800 leading-snug block">{subskill.name}</span>
+          <span className="text-[11px] mt-0.5 inline-block px-1.5 py-0.5 rounded"
+            style={{ backgroundColor: subskill.bgColour, color: subskill.colour }}>
+            {subskill.categoryName}
+          </span>
+        </span>
+      </button>
+
       {on && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-          className="overflow-hidden"
-        >
-          <div className="pl-[30px] pr-3 pb-3 space-y-2">
-            <SegmentedControl
-              options={ASSESSMENT_LEVELS.map(l => ({ value: l.value, label: l.value }))}
-              value={value.selfLevel}
-              onChange={level => onChange({ selfLevel: level })}
-              size="sm"
-              className="w-full [&>button]:flex-1"
-            />
-            <input
-              className="input-base" disabled={disabled}
-              placeholder="Where did you do this? Name the task or lesson."
-              value={value.evidenceNote ?? ''}
-              onChange={e => onChange({ evidenceNote: e.target.value })}
-            />
-            {value.evidenceNote && value.evidenceNote.trim().length < 10 && (
-              <p className="text-[11px] text-gold-700">A bit more detail, at least a few words.</p>
-            )}
-            <EvidenceDropbox
-              unitId={unitId}
-              subskillId={subskill.id}
-              files={evidence}
-              onChange={onEvidenceChange}
-              disabled={disabled}
-            />
+        <div className="px-3 pb-3 pl-10 space-y-2">
+          <div className="flex gap-1.5">
+            {ASSESSMENT_LEVELS.map(l => (
+              <button key={l.value} type="button" disabled={disabled}
+                onClick={() => onChange({ selfLevel: l.value })}
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-all
+                  ${value.selfLevel === l.value ? '' : 'border-slate-200 text-slate-400 hover:border-slate-300'}`}
+                style={value.selfLevel === l.value
+                  ? { backgroundColor: l.bg, borderColor: l.color, color: l.color } : {}}>
+                {l.value}
+              </button>
+            ))}
           </div>
-        </motion.div>
+          <input
+            className="input-base !py-2 !text-xs" disabled={disabled}
+            placeholder="Where did you do this? Name the task or lesson."
+            value={value.evidenceNote ?? ''}
+            onChange={e => onChange({ evidenceNote: e.target.value })}
+          />
+          {value.evidenceNote && value.evidenceNote.trim().length < 10 && (
+            <p className="text-[11px] text-gold-700">A bit more detail, at least a few words.</p>
+          )}
+          <EvidenceDropbox
+            unitId={unitId}
+            subskillId={subskill.id}
+            files={evidence}
+            onChange={onEvidenceChange}
+            disabled={disabled}
+          />
+        </div>
       )}
-    </SkillRow>
+    </div>
   )
 }
 

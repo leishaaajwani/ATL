@@ -5,11 +5,8 @@
 //   * School site gold bar      #A67C1F  -> gold.700
 //   * Modern Eventure cards     #123A8A  -> navy.700
 //   * Modern Eventure CTA gold  #D9A441  -> gold.500
-//
-// Navy carries structure AND primary action. Gold is an accent only: a rule, a
-// status, an active marker. It is never the dominant button colour, because a
-// screen with three gold buttons reads as a marketing page rather than as
-// software somebody uses every day.
+// Navy carries structure (headers, nav, text). Gold carries action (primary
+// buttons, active tab states). Green is reserved for confirmed/approved only.
 
 export default {
   content: [
@@ -44,55 +41,29 @@ export default {
           800: '#8a661a',
           900: '#6b4e0f',
         },
-        // One hairline colour everywhere, so surfaces read as one system.
-        hairline: '#e5e7eb',
-        ink: '#0a1e43',
+        // Semantic aliases so components stop hardcoding hex values
+        ink:     '#0a1e43',
+        parchment: '#fdfdfb',
       },
       fontFamily: {
         sans: ['"Inter"', 'system-ui', '-apple-system', 'sans-serif'],
       },
-      // Hierarchy comes from type, not from container size, so the scale is
-      // explicit rather than inherited from Tailwind's defaults.
-      fontSize: {
-        caption: ['13px', { lineHeight: '18px' }],
-        body:    ['15px', { lineHeight: '22px' }],
-        section: ['20px', { lineHeight: '26px', letterSpacing: '-0.01em' }],
-        display: ['36px', { lineHeight: '40px', letterSpacing: '-0.02em' }],
-      },
-      spacing: {
-        // 8px rhythm, with the half-step available for dense rows
-        4.5: '1.125rem',
-        13:  '3.25rem',
-      },
-      maxWidth: {
-        content: '1120px',
-      },
       boxShadow: {
-        // Architectural, not decorative. The border does the work; the shadow
-        // only lifts a surface off the page by a hair.
-        card:      '0 1px 2px 0 rgb(10 30 67 / 0.04)',
-        'card-md': '0 2px 6px -1px rgb(10 30 67 / 0.06)',
-        'card-lg': '0 8px 24px -8px rgb(10 30 67 / 0.10)',
+        card:      '0 1px 2px 0 rgb(10 30 67 / 0.05)',
+        'card-md': '0 4px 12px -2px rgb(10 30 67 / 0.08)',
+        'card-lg': '0 12px 32px -8px rgb(10 30 67 / 0.12)',
       },
       borderRadius: {
-        card: '14px',
-        control: '10px',
-        button: '12px',
-      },
-      transitionDuration: {
-        DEFAULT: '200ms',
-      },
-      transitionTimingFunction: {
-        // Standard material-style ease. No overshoot, no spring.
-        DEFAULT: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        '2xl': '1rem',
+        '3xl': '1.5rem',
       },
       animation: {
-        'fade-in':  'fadeIn 200ms cubic-bezier(0.4, 0, 0.2, 1)',
-        'slide-up': 'slideUp 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+        'fade-in':  'fadeIn 0.3s ease-out',
+        'slide-up': 'slideUp 0.4s ease-out',
       },
       keyframes: {
         fadeIn:  { from: { opacity: 0 }, to: { opacity: 1 } },
-        slideUp: { from: { opacity: 0, transform: 'translateY(6px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+        slideUp: { from: { opacity: 0, transform: 'translateY(12px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
       },
     },
   },

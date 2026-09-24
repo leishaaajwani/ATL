@@ -4,7 +4,6 @@ import { UserPlus, Upload, CheckCircle2, Clock } from 'lucide-react'
 import { adminListUsers, adminAddUser, adminImportCsv, adminUpdateUser } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
 import { PageLoader } from '../components/ui/LoadingSpinner'
-import SegmentedControl from '../components/ui/SegmentedControl'
 import toast from 'react-hot-toast'
 
 // Adding someone here is the whole invite mechanism. Their email becomes able
@@ -27,22 +26,24 @@ export default function AdminPage() {
 
   return (
     <PageLayout>
-      <div className="space-y-5">
+      <div className="space-y-6">
         <div>
           <h1 className="page-title">Roster</h1>
-          <p className="page-subtitle">
+          <p className="text-sm text-slate-500 mt-0.5">
             Anyone on this list can sign in. Anyone not on it cannot.
           </p>
         </div>
 
-        <SegmentedControl
-          options={[
-            { value: 'teacher', label: 'Teachers' },
-            { value: 'student', label: 'Students' },
-            { value: 'admin',   label: 'Admins' },
-          ]}
-          value={tab} onChange={setTab}
-        />
+        <div className="flex gap-2">
+          {['teacher', 'student', 'admin'].map(r => (
+            <button key={r} onClick={() => setTab(r)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-all ${
+                tab === r ? 'bg-navy-900 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+              }`}>
+              {r}s
+            </button>
+          ))}
+        </div>
 
         <div className="grid lg:grid-cols-2 gap-5">
           <AddOne role={tab} onDone={load} />
@@ -50,9 +51,9 @@ export default function AdminPage() {
         </div>
 
         {awaiting > 0 && (
-          <div className="card border-l-2 border-l-gold-500 flex items-center gap-2.5">
-            <Clock size={14} className="text-gold-700 shrink-0" />
-            <p className="text-caption text-slate-700">
+          <div className="card p-4 border-gold-200 bg-gold-50 flex items-center gap-2.5">
+            <Clock size={15} className="text-gold-700 shrink-0" />
+            <p className="text-sm text-navy-900">
               {awaiting} {awaiting === 1 ? 'person has' : 'people have'} not signed in yet.
               They can at any time, there is nothing to resend.
             </p>
@@ -87,8 +88,8 @@ function AddOne({ role, onDone }) {
   }
 
   return (
-    <form onSubmit={submit} className="card p-4 space-y-3">
-      <h2 className="text-caption font-semibold text-slate-800 flex items-center gap-2">
+    <form onSubmit={submit} className="card p-5 space-y-3">
+      <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
         <UserPlus size={15} className="text-navy-700" /> Add one {role}
       </h2>
       <input className="input-base" placeholder="Full name" value={fullName}
@@ -130,11 +131,11 @@ function ImportCsv({ role, onDone }) {
   }
 
   return (
-    <form onSubmit={submit} className="card p-4 space-y-3">
-      <h2 className="text-caption font-semibold text-slate-800 flex items-center gap-2">
+    <form onSubmit={submit} className="card p-5 space-y-3">
+      <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
         <Upload size={15} className="text-navy-700" /> Bulk import
       </h2>
-      <p className="text-caption text-slate-500 leading-relaxed">
+      <p className="text-xs text-slate-500 leading-relaxed">
         One per line: name, email{role === 'student' ? ', grade' : ', staff id'}.
         A header row is fine, it gets skipped.
       </p>
@@ -161,7 +162,7 @@ function ImportCsv({ role, onDone }) {
 
 function RosterTable({ users, role, onChange }) {
   if (!users.length) {
-    return <div className="card px-5 py-8 text-center text-sm text-slate-500">No {role}s on the roster yet.</div>
+    return <div className="card p-10 text-center text-sm text-slate-500">No {role}s on the roster yet.</div>
   }
 
   async function setStatus(id, status) {
@@ -190,7 +191,7 @@ function RosterTable({ users, role, onChange }) {
                 className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors">
                 <td className="py-3 px-4 font-medium text-slate-900">
                   {u.fullName}
-                  {u.grade && <span className="ml-2 badge-neutral">{u.grade}</span>}
+                  {u.grade && <span className="ml-2 badge bg-navy-50 text-navy-700">{u.grade}</span>}
                 </td>
                 <td className="py-3 px-4 text-slate-500 text-xs">{u.email}</td>
                 <td className="py-3 px-4 text-center text-slate-600">
@@ -200,11 +201,11 @@ function RosterTable({ users, role, onChange }) {
                   {u.status === 'active'
                     ? <span className="badge bg-emerald-50 text-emerald-700"><CheckCircle2 size={11} /> Active</span>
                     : u.status === 'invited'
-                    ? <span className="badge-waiting"><Clock size={11} /> Not signed in</span>
+                    ? <span className="badge bg-gold-100 text-gold-800"><Clock size={11} /> Not signed in</span>
                     : <span className="badge bg-slate-100 text-slate-500">Disabled</span>}
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <button className="text-[11px] text-slate-400 hover:text-slate-700 transition-colors"
+                  <button className="text-xs text-slate-400 hover:text-slate-700 transition-colors"
                     onClick={() => setStatus(u.id, u.status === 'disabled' ? 'active' : 'disabled')}>
                     {u.status === 'disabled' ? 'Re-enable' : 'Disable'}
                   </button>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PenLine, AlertCircle } from 'lucide-react'
+import { PenLine, Clock, CheckCircle2, AlertCircle, BookOpen } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getMyUnits, getRatings } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
@@ -10,14 +10,8 @@ import { PageLoader } from '../components/ui/LoadingSpinner'
 import { SCORE_MAP, SCORE_LABEL } from '../utils/atlFramework'
 import toast from 'react-hot-toast'
 
-// Entrance motion stays under the 200ms budget and barely moves: a dashboard
-// somebody opens twenty times a day should not perform on each load.
-const EASE = [0.4, 0, 0.2, 1]
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.03 } } }
-const item = {
-  hidden: { opacity: 0, y: 4 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.18, ease: EASE } },
-}
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
+const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
 
 export default function StudentDashboard() {
   const { profile } = useAuth()
@@ -46,15 +40,15 @@ export default function StudentDashboard() {
 
   return (
     <PageLayout>
-      <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
+      <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
         <motion.div variants={item} className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="page-title">
               Good {timeGreeting()}, {profile?.fullName?.split(' ')[0] ?? 'there'}
             </h1>
-            <p className="page-subtitle">Your ATL skills across every unit</p>
+            <p className="text-sm text-slate-500 mt-0.5">Your ATL skills across every unit</p>
           </div>
-          <Link to="/reflect"><button className="btn-primary"><PenLine size={15} /> New reflection</button></Link>
+          <Link to="/reflect"><button className="btn-accent"><PenLine size={15} /> New reflection</button></Link>
         </motion.div>
 
         {/* Returned work goes first, because it is the only thing that is blocked */}
@@ -68,11 +62,11 @@ export default function StudentDashboard() {
             </div>
             <div className="space-y-2">
               {returned.map(u => (
-                <div key={u.id} className="bg-white rounded-control p-3 border border-gold-200/60">
+                <div key={u.id} className="bg-white rounded-xl p-3 border border-gold-200/60">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="min-w-0">
-                      <p className="text-caption font-medium text-slate-900">{u.subjectName}</p>
-                      <p className="text-caption text-slate-500 mt-0.5">{u.term} · {u.name}</p>
+                      <p className="text-sm font-medium text-slate-900">{u.subjectName}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{u.term} · {u.name}</p>
                     </div>
                     <Link to={`/reflect?unitId=${u.id}`}>
                       <button className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-navy-900 text-white hover:bg-navy-800 transition-colors">
@@ -91,27 +85,27 @@ export default function StudentDashboard() {
           </motion.div>
         )}
 
-        <motion.div variants={item}>
-          <StatRail items={[
-            { label: 'Units',      value: stats.total },
-            { label: 'Approved',   value: stats.done },
-            { label: 'Awaiting review', value: stats.pending },
-            { label: 'Still to do', value: stats.todo, accent: stats.todo > 0 },
-          ]} />
+        <motion.div variants={item} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Stat label="Units"     value={stats.total}   icon={BookOpen}    tone="navy" />
+          <Stat label="Approved"  value={stats.done}    icon={CheckCircle2} tone="green" />
+          <Stat label="Awaiting review" value={stats.pending} icon={Clock}  tone="gold" />
+          <Stat label="Still to do" value={stats.todo}  icon={PenLine}     tone="slate" />
         </motion.div>
 
         <motion.div variants={item}>
-          <Card flush>
-            <CardHeader inset title="Your units" subtitle={`${units.length} across your subjects`} />
+          <Card>
+            <CardHeader title="Your units" subtitle={`${units.length} across your subjects`} />
             {units.length === 0 ? (
-              <div className="px-4 py-8 text-center">
+              <div className="py-10 text-center">
                 <p className="text-sm font-medium text-slate-700">Nothing here yet</p>
-                <p className="text-caption text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
                   Units appear once your teachers create them and your class enrolment is confirmed.
                 </p>
               </div>
             ) : (
-              units.map(u => <UnitRow key={u.id} unit={u} />)
+              <div className="space-y-2">
+                {units.map(u => <UnitRow key={u.id} unit={u} />)}
+              </div>
             )}
           </Card>
         </motion.div>
@@ -129,25 +123,24 @@ export default function StudentDashboard() {
 function UnitRow({ unit }) {
   const status = unit.reflectionStatus
   const badge =
-    status === 'approved' ? { cls: 'badge-positive', text: 'Approved' }
-  : status === 'pending'  ? { cls: 'badge-waiting',      text: 'Awaiting review' }
-  : status === 'returned' ? { cls: 'badge-alert',       text: 'Needs revision' }
-  : !unit.isOpen          ? { cls: 'badge-neutral',    text: 'Closed' }
-  :                         { cls: 'badge-neutral',    text: 'Not started' }
+    status === 'approved' ? { cls: 'bg-emerald-50 text-emerald-700', text: 'Approved' }
+  : status === 'pending'  ? { cls: 'bg-gold-100 text-gold-800',      text: 'Awaiting review' }
+  : status === 'returned' ? { cls: 'bg-rose-50 text-rose-700',       text: 'Needs revision' }
+  : !unit.isOpen          ? { cls: 'bg-slate-100 text-slate-500',    text: 'Closed' }
+  :                         { cls: 'bg-navy-50 text-navy-700',       text: 'Not started' }
 
   const clickable = !status || status === 'returned'
 
   const body = (
-    <div className={`flex items-center justify-between gap-3 px-4 py-2.5
-      border-b border-hairline last:border-0 transition-colors duration-200
+    <div className={`flex items-center justify-between gap-3 p-3 rounded-xl transition-colors
       ${clickable && unit.isOpen ? 'hover:bg-slate-50 cursor-pointer' : ''}`}>
       <div className="min-w-0">
-        <p className="text-caption font-medium text-slate-900 truncate">{unit.name}</p>
-        <p className="text-[11px] text-slate-500 mt-0.5">
+        <p className="text-sm font-medium text-slate-900 truncate">{unit.name}</p>
+        <p className="text-xs text-slate-500 mt-0.5">
           {unit.subjectName} · {unit.term} · {unit.subskills?.length ?? 0} sub-skills
         </p>
       </div>
-      <span className={`shrink-0 ${badge.cls}`}>{badge.text}</span>
+      <span className={`badge shrink-0 ${badge.cls}`}>{badge.text}</span>
     </div>
   )
 
@@ -174,7 +167,7 @@ function TeacherRatings({ ratings }) {
           }, {})
           return (
             <div key={subject}>
-              <p className="text-caption font-medium text-slate-800 mb-2">{subject}</p>
+              <p className="text-sm font-medium text-slate-800 mb-2">{subject}</p>
               <div className="flex flex-wrap gap-1.5">
                 {Object.entries(byCategory).map(([cat, { colour, bg, scores }]) => {
                   const avg = scores.reduce((a, b) => a + b, 0) / scores.length
@@ -194,21 +187,21 @@ function TeacherRatings({ ratings }) {
   )
 }
 
-// A metric rail, not four floating cards. One surface divided by hairlines
-// reads as a single summary; four bordered boxes with icon chips is the
-// generic dashboard look this interface is trying not to have.
-function StatRail({ items }) {
+function Stat({ label, value, icon: Icon, tone }) {
+  const tones = {
+    navy:  { bg: '#f2f6fc', fg: '#123a8a' },
+    green: { bg: '#ecfdf5', fg: '#059669' },
+    gold:  { bg: '#fbf3e3', fg: '#a67c1f' },
+    slate: { bg: '#f8fafc', fg: '#475569' },
+  }
+  const { bg, fg } = tones[tone]
   return (
-    <div className="card flush grid grid-cols-2 sm:grid-cols-4 divide-x divide-hairline">
-      {items.map(({ label, value, accent }) => (
-        <div key={label} className="px-4 py-3">
-          <p className="text-caption text-slate-500 leading-tight">{label}</p>
-          <p className={`text-[26px] font-semibold leading-none mt-1.5 tabular-nums
-            ${accent ? 'text-gold-700' : 'text-navy-900'}`}>
-            {value}
-          </p>
-        </div>
-      ))}
+    <div className="card p-4">
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: bg }}>
+        <Icon size={15} style={{ color: fg }} />
+      </div>
+      <p className="text-2xl font-semibold text-slate-900">{value}</p>
+      <p className="text-xs text-slate-500 mt-0.5">{label}</p>
     </div>
   )
 }

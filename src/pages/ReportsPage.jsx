@@ -5,10 +5,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { getRoster, getRatings, saveRating } from '../api/client'
 import PageLayout from '../components/layout/PageLayout'
 import { PageLoader } from '../components/ui/LoadingSpinner'
-import SegmentedControl from '../components/ui/SegmentedControl'
 import { ASSESSMENT_LEVELS, SCORE_MAP, SCORE_LABEL } from '../utils/atlFramework'
 import toast from 'react-hot-toast'
 
+const TERMS = ['Term 1', 'Term 2', 'Term 3']
 
 // Rating is now per sub-skill. A student can be Proficient at one Thinking
 // sub-skill and Developing at another in the same unit, which is the whole
@@ -41,9 +41,9 @@ export default function ReportsPage() {
   if (!sections.length) {
     return (
       <PageLayout>
-        <div className="card px-5 py-8 text-center max-w-md mx-auto">
-          <p className="text-caption font-medium text-slate-800">No classes yet</p>
-          <p className="text-caption text-slate-500 mt-1">Set up your classes before writing reports.</p>
+        <div className="card p-10 text-center max-w-md mx-auto">
+          <p className="text-sm font-medium text-slate-800">No classes yet</p>
+          <p className="text-xs text-slate-500 mt-1">Set up your classes before writing reports.</p>
         </div>
       </PageLayout>
     )
@@ -54,7 +54,7 @@ export default function ReportsPage() {
       <div className="space-y-5">
         <div>
           <h1 className="page-title">Term Reports</h1>
-          <p className="page-subtitle">
+          <p className="text-sm text-slate-500 mt-0.5">
             Rate each sub-skill against what the student claimed
           </p>
         </div>
@@ -66,13 +66,22 @@ export default function ReportsPage() {
               <option key={s.id} value={s.id}>{s.subjectName} · {s.grade}</option>
             ))}
           </select>
-          <SegmentedControl options={['Term 1', 'Term 2', 'Term 3']} value={term} onChange={setTerm} />
+          <div className="flex gap-1.5">
+            {TERMS.map(t => (
+              <button key={t} onClick={() => setTerm(t)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  term === t ? 'bg-navy-900 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}>
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading ? <PageLoader /> : students.length === 0 ? (
-          <div className="card px-5 py-8 text-center">
-            <p className="text-caption font-medium text-slate-800">No confirmed students in this class</p>
-            <p className="text-caption text-slate-500 mt-1">
+          <div className="card p-10 text-center">
+            <p className="text-sm font-medium text-slate-800">No confirmed students in this class</p>
+            <p className="text-xs text-slate-500 mt-1">
               Students appear here once you confirm their enrolment request.
             </p>
           </div>
@@ -129,12 +138,12 @@ function StudentReport({ student, sectionId, term, open, onToggle }) {
   return (
     <div className="card overflow-hidden">
       <button onClick={onToggle} className="w-full flex items-center gap-3 p-4 text-left">
-        <div className="w-9 h-9 rounded-control bg-navy-100 flex items-center justify-center shrink-0 text-navy-800 text-sm font-semibold">
+        <div className="w-9 h-9 rounded-xl bg-navy-100 flex items-center justify-center shrink-0 text-navy-800 text-sm font-semibold">
           {student.fullName?.charAt(0)}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-caption font-medium text-slate-900 truncate">{student.fullName}</p>
-          <p className="text-caption text-slate-500 mt-0.5">
+          <p className="text-sm font-medium text-slate-900 truncate">{student.fullName}</p>
+          <p className="text-xs text-slate-500 mt-0.5">
             {student.approvedCount} approved · {student.pendingCount} awaiting review
           </p>
         </div>
@@ -157,12 +166,12 @@ function StudentReport({ student, sectionId, term, open, onToggle }) {
                   {units.map(u => (
                     <div key={u.unitId}>
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <p className="text-caption font-semibold text-slate-800">{u.unitName}</p>
+                        <p className="text-sm font-semibold text-slate-800">{u.unitName}</p>
                         {u.reflectionStatus
-                          ? <span className={
-                              u.reflectionStatus === 'approved' ? 'badge-positive'
-                              : u.reflectionStatus === 'pending' ? 'badge-waiting'
-                              : 'badge-alert'}>
+                          ? <span className={`badge ${
+                              u.reflectionStatus === 'approved' ? 'bg-emerald-50 text-emerald-700'
+                              : u.reflectionStatus === 'pending' ? 'bg-gold-100 text-gold-800'
+                              : 'bg-rose-50 text-rose-700'}`}>
                               {u.reflectionStatus}
                             </span>
                           : <span className="badge bg-slate-100 text-slate-500">no reflection</span>}
@@ -194,7 +203,7 @@ function SubskillRating({ subskill: ss, onRate }) {
     ? (SCORE_MAP[ss.teacherLevel] ?? 0) - (SCORE_MAP[ss.selfLevel] ?? 0) : null
 
   return (
-    <div className="rounded-control border border-slate-100 p-3">
+    <div className="rounded-xl border border-slate-100 p-3">
       <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
         <div className="min-w-0">
           <p className="text-xs font-medium text-slate-800 leading-snug">
@@ -246,7 +255,7 @@ function TermSummary({ rated, term }) {
   }, {})
 
   return (
-    <div className="rounded-control bg-navy-50 p-4">
+    <div className="rounded-xl bg-navy-50 p-4">
       <p className="text-xs font-semibold text-navy-900 uppercase tracking-wide mb-2">
         {term} summary
       </p>
