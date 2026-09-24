@@ -1,219 +1,166 @@
 # ATL Nexus
 
-A production-quality web application for IB Diploma Programme students to track, reflect on, and demonstrate growth in Approaches to Learning (ATL) skills.
+An Approaches to Learning tracker for GEMS Modern Academy, covering both MYP and DP.
 
-## Tech Stack
+Students record what they actually did in a unit against the specific ATL
+sub-skills their teacher tagged, attach evidence, and write a structured
+reflection. Teachers approve or return that work, then rate each sub-skill.
+Term reports aggregate from real entries rather than from a guess at the end of
+term.
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 19 + Vite 8 |
-| Styling | TailwindCSS 3 |
-| Auth | Firebase Authentication (Google) |
-| Database | Firestore |
-| Charts | Recharts |
-| Animation | Framer Motion |
-| Routing | React Router v6 |
-| Deployment | Vercel |
+---
 
-## Project Structure
+## Getting it running
 
-```
-atl-nexus/
-├── src/
-│   ├── components/
-│   │   ├── charts/         # Radar, Bar, Line, Circular chart components
-│   │   ├── layout/         # Sidebar, PageLayout
-│   │   └── ui/             # Button, Card, Badge, Input, Modal, LoadingSpinner
-│   ├── contexts/
-│   │   └── AuthContext.jsx # Firebase auth state + user role
-│   ├── firebase/
-│   │   ├── config.js       # Firebase app initialisation
-│   │   ├── auth.js         # Sign-in, sign-out, user document helpers
-│   │   ├── firestore.js    # All Firestore queries and subscriptions
-│   │   └── seed.js         # Demo data seeder
-│   ├── hooks/
-│   │   ├── useATLEntries.js  # Firestore real-time subscriptions
-│   │   └── useAnalytics.js   # Score calculations and chart data derivation
-│   ├── pages/
-│   │   ├── Landing.jsx
-│   │   ├── Login.jsx
-│   │   ├── StudentDashboard.jsx
-│   │   ├── TeacherDashboard.jsx
-│   │   ├── ReflectionEntry.jsx
-│   │   ├── Analytics.jsx
-│   │   ├── ApprovalReview.jsx
-│   │   └── StudentsPage.jsx
-│   └── utils/
-│       ├── atlFramework.js   # ATL categories, substrands, scoring constants
-│       └── helpers.js        # Date formatting, groupBy, cn(), etc.
-├── firestore.rules           # Firestore security rules
-├── vercel.json               # SPA rewrite rules + security headers
-└── .env.example              # Environment variable template
-```
+Four steps, about ten minutes. You do not need a Firebase key to look around.
 
-## Getting Started
-
-### 1. Clone and install
+### 1. Install and start MySQL 8
 
 ```bash
-git clone <your-repo-url>
-cd atl-nexus
-npm install
+brew install mysql && brew services start mysql
 ```
 
-### 2. Create a Firebase project
+On Linux use your package manager; on Windows use the MySQL installer. Anything
+8.0 or newer works, 5.7 does not.
 
-1. Go to [console.firebase.google.com](https://console.firebase.google.com)
-2. Create a new project
-3. Enable **Authentication → Google** provider
-4. Enable **Firestore Database** (start in production mode)
-5. Go to **Project Settings → General** and copy your web app config
+### 2. Create the database
 
-### 3. Configure environment variables
+```bash
+mysql -u root -e "CREATE DATABASE atl_nexus CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER 'atl'@'localhost' IDENTIFIED BY 'devpassword'; GRANT ALL ON atl_nexus.* TO 'atl'@'localhost';"
+```
+
+### 3. Load schema, curriculum and demo data
+
+```bash
+mysql -u atl -pdevpassword atl_nexus < db/schema.sql
+mysql -u atl -pdevpassword atl_nexus < db/curriculum.sql
+mysql -u atl -pdevpassword atl_nexus < db/seeds/005_demo_people.sql
+```
+
+`schema.sql` is every table. `curriculum.sql` is the subject list, the five ATL
+categories and 326 sub-skills. `005_demo_people.sql` is optional but
+recommended: it creates fictional staff and students so there is something to
+click through.
+
+### 4. Configure and run
 
 ```bash
 cp .env.example .env
-```
-
-Fill in your Firebase credentials in `.env`:
-
-```env
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-```
-
-### 4. Deploy Firestore security rules
-
-```bash
-npm install -g firebase-tools
-firebase login
-firebase init firestore   # select your project, use existing firestore.rules
-firebase deploy --only firestore:rules
-```
-
-### 5. Run locally
-
-```bash
+npm install
 npm run dev
 ```
 
-## User Roles
+Open **http://localhost:5173**.
 
-### Student
-- Sign in with Google → automatically gets `role: "student"`
-- Creates reflection entries across subjects
-- Sees personal analytics and chart progression
-- Views teacher feedback on entries
+That starts two processes: Vite on 5173 and the API on 3001, with Vite proxying
+`/api` across. You do not need the Vercel CLI.
 
-### Teacher
-Teacher accounts must be manually promoted. After a teacher signs in once, run this in your browser console (or Firebase console):
+---
 
-```javascript
-// In Firebase Console > Firestore > users collection
-// Find the teacher's document and change role field to "teacher"
+## Looking around without signing in
+
+`.env.example` ships with a development login enabled, so the app opens as a
+teacher straight away. A pill in the bottom-right corner switches account.
+
+| Account | Role | What they have |
+|---|---|---|
+| `r.mehta@example.edu` | Teacher | Chemistry DP1, Chemistry MYP4, with units and a student waiting to be confirmed |
+| `f.haddad@example.edu` | Teacher | Math AI DP1, with a reflection waiting to be reviewed |
+| `j.okafor@example.edu` | Student | DP1, one approved reflection and one sent back for revision |
+| `s.tanaka@example.edu` | Student | MYP4, so you can see the MYP sub-skill set |
+| `coordinator@example.edu` | Admin | The roster |
+
+The choice is held per browser tab, so you can open two tabs and watch the
+student and teacher sides at the same time.
+
+This bypass cannot reach production. `VITE_DEV_LOGIN` sits behind
+`import.meta.env.DEV`, the API half lives in `api/_lib/dev-server.mjs` which
+Vercel never executes, and the seam it uses refuses to install when `NODE_ENV`
+is production. Delete both lines from `.env` once you have real sign-in working.
+
+---
+
+## Going live
+
+Two things are needed beyond the above.
+
+**A Firebase service-account key**, so real Google sign-ins can be verified.
+Firebase console, Project settings, Service accounts, Generate new private key.
+Put the downloaded JSON into `.env` as a single-line string under
+`FIREBASE_SERVICE_ACCOUNT`. Treat it like a password.
+
+**A MySQL host the API can reach.** Vercel functions connect from the public
+internet, so an internal-only school server will not work unless the API runs
+inside the network too. Point `DATABASE_URL` at whatever you use and run the
+same three SQL files.
+
+There is no sign-up by design, so the first admin is inserted by hand:
+
+```sql
+INSERT INTO users (email, full_name, role, status)
+VALUES ('you@school.edu', 'Your Name', 'admin', 'invited');
 ```
 
-Or using the seed helper — call `seedDemoData(teacherUid)` from the browser console after importing `seed.js`.
+Everyone else is added through the admin interface after that.
 
-## Seeding Demo Data
+---
 
-To populate the app with realistic sample data:
-
-1. Open the app in your browser
-2. Open the browser console
-3. Run:
-
-```javascript
-import('/src/firebase/seed.js').then(m => m.seedDemoData('YOUR_TEACHER_UID'))
-```
-
-Replace `YOUR_TEACHER_UID` with the Firebase UID of the user you want to promote to teacher. This creates 3 demo students and 8 reflections across various ATL categories and approval states.
-
-## ATL Framework
-
-Categories and substrands implemented:
-
-| Category | Substrands |
-|---|---|
-| Communication | Written, Oral & visual, Digital & media, Non-verbal, Reading & interpreting |
-| Social | Collaboration, Leadership, Conflict resolution, Peer relationships, Group goals |
-| Self-management | Organisation, Time management, Goal setting, Emotional regulation, Metacognition |
-| Research | Information literacy, Media evaluation, Data collection, Citation, Synthesis |
-| Thinking | Critical, Creative, Transfer, Problem-solving, Systems thinking |
-
-## Scoring Model
-
-| Self-assessment | Internal score |
-|---|---|
-| Emerging | 1 |
-| Developing | 2 |
-| Proficient | 3 |
-| Advanced | 4 |
-
-Only teacher-approved entries contribute to analytics. Teachers can override the student's self-assessment score during the approval process.
-
-## Approval Workflow
+## How it fits together
 
 ```
-Student submits entry (status: pending)
-         ↓
-Teacher reviews in /approvals
-         ↓
-    ┌────┴────┐
-  Approve   Reject
-    ↓          ↓
- Approved   Returned
- (counts    (student
- toward     revises)
- analytics)
+src/                React app
+  api/client.js     the only thing that talks to the backend
+  contexts/         auth state, resolved from /api/me
+  pages/            one file per screen
+  components/       shared UI, charts, the evidence dropbox
+api/                Vercel serverless functions (the backend)
+  _lib/auth.js      verifies the Firebase token, resolves the roster
+  _lib/db.js        pooled MySQL connection
+  _lib/storage.js   evidence files: Firebase Storage, or local disk in dev
+  _lib/dev-server.mjs   runs the above locally; never deployed
+db/                 schema, curriculum, seeds, migration and test scripts
 ```
 
-## Deployment to Vercel
+**Firebase does identity only.** It proves who someone is. Whether they have an
+account, and what they can see, is answered entirely by MySQL. Nothing is
+stored in Firestore.
+
+**`sections` is the access-control boundary.** A section is one taught class.
+A teacher sees a student's work only when that student has an active enrolment
+in a section that teacher owns, and every teacher-facing query joins through it.
+Filtering happens in SQL, so the browser never receives another student's data.
+
+**Sub-skills are addressed on two axes.** `subject_id` null means generic,
+set means that subject only. `programme` null means both MYP and DP, set means
+one. So Chemistry DP offers *deducing a mechanism from kinetic evidence* while
+Chemistry MYP offers *spotting a pattern in your results*, and neither class is
+ever shown the other's set.
+
+---
+
+## Commands
 
 ```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Deploy
-vercel
-
-# Set environment variables in Vercel dashboard or via CLI:
-vercel env add VITE_FIREBASE_API_KEY
-# ... repeat for all env vars
+npm run dev        # Vite + the API together
+npm run build      # production build
+npm test           # 33 assertions against the real database
+npm run lint
 ```
 
-The `vercel.json` file handles SPA routing rewrites and adds security headers automatically.
+`npm test` runs `db/smoke-test.mjs`, which exercises the real route handlers:
+the sub-skill gate, cross-teacher isolation, the return/revise/approve loop and
+its audit trail, per-sub-skill rating upserts, and student-to-student privacy.
+It creates its own fixtures and cleans up after itself.
 
-## Environment Variable Security
+---
 
-- Never commit `.env` to version control (it's in `.gitignore`)
-- `VITE_` prefix exposes variables to the browser — this is intentional for Firebase config (Firebase API keys are safe to expose; security is enforced by Firestore rules)
-- Sensitive operations are protected by Firestore security rules, not by hiding the API key
+## A note on the data in this repository
 
-## Firestore Data Model
+No real staff or student records are committed here. `curriculum.sql` holds
+subjects and sub-skills only, and everyone in `005_demo_people.sql` is invented,
+on `example.edu`, which cannot receive mail or be signed in to.
 
-### `users/{uid}`
-```
-uid, displayName, email, photoURL, role, createdAt, updatedAt
-```
-
-### `atl_entries/{entryId}`
-```
-studentId, studentName, subject, atlCategory, substrand,
-reflection, selfAssessment, score, term,
-approvalStatus, teacherFeedback, teacherScore,
-createdAt, updatedAt, reviewedAt
-```
-
-## Future Roadmap
-
-- Microsoft Authentication (Azure AD / Entra ID)
-- Export to PDF report
-- Class section management
-- Parent view (read-only)
-- Notification system for pending approvals
-- Multi-school / multi-class support
+The seeded sub-skills are a considered starting set, not curriculum. Chemistry
+and Math AI are written out in full as the worked examples. Before any pilot,
+the teacher who owns each subject should read their own list and change what
+does not match how they actually teach it. That is editable in the app.
