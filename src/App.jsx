@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth, homeFor } from './contexts/AuthContext'
 import { PageLoader } from './components/ui/LoadingSpinner'
+import DevUserSwitcher from './components/DevUserSwitcher'
 import NotOnRoster     from './pages/NotOnRoster'
 import Landing         from './pages/Landing'
 import Login           from './pages/Login'
@@ -77,6 +78,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <DevUserSwitcher />
         <Toaster
           position="top-right"
           toastOptions={{

@@ -24,21 +24,26 @@ const exists = async p => { try { await stat(p); return true } catch { return fa
 // and never runs this file, and the seam it uses refuses to install itself when
 // NODE_ENV is production. It is a development convenience, not a back door.
 async function installDevLogin() {
-  const email = process.env.DEV_LOGIN_AS?.trim().toLowerCase()
-  if (!email) return null
+  const fallback = process.env.DEV_LOGIN_AS?.trim().toLowerCase()
+  if (!fallback) return null
 
   const { q1 } = await import('./db.js')
   const { __setAuthenticatorForTests, HttpError } = await import('./auth.js')
 
-  __setAuthenticatorForTests(async () => {
+  // The x-dev-user header wins over the env var, so two browser windows can be
+  // two different people at the same time. That is what makes it possible to
+  // watch a student submit and a teacher approve side by side.
+  __setAuthenticatorForTests(async req => {
+    const header = String(req.headers['x-dev-user'] ?? '').trim().toLowerCase()
+    const email = header || fallback
     const user = await q1(
       `SELECT id, email, full_name, role, status, google_sub FROM users WHERE email = ?`,
       [email],
     )
-    if (!user) throw new HttpError(403, `DEV_LOGIN_AS is set to ${email}, which is not on the roster`)
+    if (!user) throw new HttpError(403, `${email} is not on the roster`)
     return user
   })
-  return email
+  return fallback
 }
 
 async function resolveRoute(pathname) {
@@ -57,6 +62,23 @@ const server = createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
   if (req.method === 'OPTIONS') { res.writeHead(204).end(); return }
+
+  // Handled here rather than as a file in /api, so it has no production
+  // counterpart: Vercel only serves what is in /api, and this file is not.
+  if (url.pathname === '/api/__dev/users' && process.env.DEV_LOGIN_AS) {
+    const { q } = await import('./db.js')
+    const rows = await q(
+      `SELECT u.email, u.full_name AS fullName, u.role,
+              (SELECT COUNT(*) FROM sections s    WHERE s.teacher_id = u.id) AS teaches,
+              (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = u.id
+                                                    AND e.status = 'active') AS enrolled
+         FROM users u
+        ORDER BY FIELD(u.role, 'admin', 'teacher', 'student'), u.full_name`,
+    )
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ users: rows }))
+    return
+  }
 
   const file = await resolveRoute(url.pathname)
   if (!file) {

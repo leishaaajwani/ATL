@@ -28,16 +28,41 @@ async function token() {
   return user.getIdToken()
 }
 
+// Which roster email this tab is acting as, in dev login mode.
+//
+// sessionStorage, not localStorage, and that distinction is the whole point:
+// localStorage is shared by every tab on the origin, so both windows would show
+// the same person. sessionStorage is scoped to one tab, which is what lets you
+// watch a student submit in one window and a teacher approve in the other.
+// It survives reloads within the tab and clears when the tab closes.
+const DEV_USER_KEY = 'atl.devUser'
+
+export function getDevUser() {
+  if (!DEV_LOGIN) return null
+  try { return sessionStorage.getItem(DEV_USER_KEY) } catch { return null }
+}
+
+export function setDevUser(email) {
+  try {
+    if (email) sessionStorage.setItem(DEV_USER_KEY, email)
+    else sessionStorage.removeItem(DEV_USER_KEY)
+  } catch { /* private window, fall back to the env default */ }
+}
+
+export const listDevUsers = () => get('/__dev/users')
+
 async function request(path, { method = 'GET', body, params } = {}) {
   const url = new URL(`${BASE}${path}`, window.location.origin)
   for (const [k, v] of Object.entries(params ?? {})) {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v)
   }
 
+  const devUser = getDevUser()
   const res = await fetch(url, {
     method,
     headers: {
       Authorization: `Bearer ${await token()}`,
+      ...(devUser ? { 'x-dev-user': devUser } : {}),
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
