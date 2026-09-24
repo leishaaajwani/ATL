@@ -1,33 +1,37 @@
--- ATL Nexus :: demo people
+-- ATL Nexus :: demo accounts
 --
--- Entirely fictional. Real staff and students are never committed to this
--- repository, so anyone setting up a copy starts with invented accounts and
--- adds their own school through the admin interface.
+-- The accounts are named for what they demonstrate rather than for invented
+-- people, so anyone reviewing the app can tell from the switcher which one to
+-- open to see a given part of the system. Real staff and students are never
+-- committed to this repository.
 --
 -- Emails use example.edu, which cannot receive mail and cannot be signed in to,
 -- so this data is only reachable through the local DEV_LOGIN_AS bypass.
 --
--- Covers what a reviewer needs to see: one admin, two teachers, three students,
--- both programmes, Chemistry and Math AI written out, and a reflection sitting
--- in each state of the approval loop.
+--   admin@example.edu      the roster
+--   teacher1@example.edu   Chemistry DP1 and MYP4, one student awaiting confirmation
+--   teacher2@example.edu   Math AI DP1, one reflection awaiting review
+--   student1@example.edu   DP1, one approved reflection and one sent back
+--   student2@example.edu   DP1, still waiting for a teacher to confirm them
+--   student3@example.edu   MYP4, so the MYP sub-skill set is visible
 
 SET @yr := (SELECT id FROM academic_years WHERE is_current = 1);
 
--- ── People ──────────────────────────────────────────────────────────────────
+-- -- Accounts ----------------------------------------------------------------
 INSERT INTO users (email, full_name, role, status, google_sub, first_login_at) VALUES
-  ('coordinator@example.edu', 'Amara Osei',     'admin',   'active', 'demo-admin-1',   NOW()),
-  ('r.mehta@example.edu',     'Rohan Mehta',    'teacher', 'active', 'demo-teacher-1', NOW()),
-  ('f.haddad@example.edu',    'Farah Haddad',   'teacher', 'active', 'demo-teacher-2', NOW()),
-  ('j.okafor@example.edu',    'Jamal Okafor',   'student', 'active', 'demo-student-1', NOW()),
-  ('l.moreau@example.edu',    'Lucie Moreau',   'student', 'active', 'demo-student-2', NOW()),
-  ('s.tanaka@example.edu',    'Sora Tanaka',    'student', 'active', 'demo-student-3', NOW());
+  ('admin@example.edu',    'Admin - roster',                    'admin',   'active', 'demo-admin-1',   NOW()),
+  ('teacher1@example.edu', 'Teacher 1 - Chemistry DP1 and MYP4','teacher', 'active', 'demo-teacher-1', NOW()),
+  ('teacher2@example.edu', 'Teacher 2 - Math AI DP1',           'teacher', 'active', 'demo-teacher-2', NOW()),
+  ('student1@example.edu', 'Student 1 - has work in review',    'student', 'active', 'demo-student-1', NOW()),
+  ('student2@example.edu', 'Student 2 - awaiting confirmation', 'student', 'active', 'demo-student-2', NOW()),
+  ('student3@example.edu', 'Student 3 - MYP4',                  'student', 'active', 'demo-student-3', NOW());
 
-SET @admin := (SELECT id FROM users WHERE email = 'coordinator@example.edu');
-SET @rohan := (SELECT id FROM users WHERE email = 'r.mehta@example.edu');
-SET @farah := (SELECT id FROM users WHERE email = 'f.haddad@example.edu');
-SET @jamal := (SELECT id FROM users WHERE email = 'j.okafor@example.edu');
-SET @lucie := (SELECT id FROM users WHERE email = 'l.moreau@example.edu');
-SET @sora  := (SELECT id FROM users WHERE email = 's.tanaka@example.edu');
+SET @admin := (SELECT id FROM users WHERE email = 'admin@example.edu');
+SET @rohan := (SELECT id FROM users WHERE email = 'teacher1@example.edu');
+SET @farah := (SELECT id FROM users WHERE email = 'teacher2@example.edu');
+SET @jamal := (SELECT id FROM users WHERE email = 'student1@example.edu');
+SET @lucie := (SELECT id FROM users WHERE email = 'student2@example.edu');
+SET @sora  := (SELECT id FROM users WHERE email = 'student3@example.edu');
 
 INSERT INTO teacher_profiles (user_id, staff_id, department) VALUES
   (@rohan, 'T-2041', 'Sciences'),
@@ -38,7 +42,7 @@ INSERT INTO student_profiles (user_id, student_code, grade) VALUES
   (@lucie, 'S-11077', 'DP1'),
   (@sora,  'S-09310', 'MYP4');
 
--- ── Classes ─────────────────────────────────────────────────────────────────
+-- -- Classes -----------------------------------------------------------------
 SET @chem := (SELECT id FROM subjects WHERE name = 'Chemistry');
 SET @math := (SELECT id FROM subjects WHERE name = 'Math AI');
 
@@ -58,7 +62,7 @@ INSERT INTO enrollments (section_id, student_id, status, source, approved_at, ap
   (@mathDP,  @jamal, 'active',  'teacher_added', NOW(), @farah),
   (@chemMYP, @sora,  'active',  'teacher_added', NOW(), @rohan);
 
--- ── Units ───────────────────────────────────────────────────────────────────
+-- -- Units -------------------------------------------------------------------
 INSERT INTO units (section_id, term, name, description, min_subskills_required) VALUES
   (@chemDP,  'Term 1', 'Stoichiometry and the Mole',    'Quantitative chemistry and the reacting-mass calculations that follow from it.', 3),
   (@chemDP,  'Term 2', 'Energetics and Thermodynamics', 'Enthalpy, entropy, and what makes a reaction go.', 3),
@@ -81,7 +85,7 @@ SELECT u.id, ss.id
    ) ranked WHERE rn <= 3
  );
 
--- ── One reflection in each state of the loop ────────────────────────────────
+-- -- One reflection in each state of the loop --------------------------------
 SET @unitStoich := (SELECT id FROM units WHERE name = 'Stoichiometry and the Mole');
 SET @unitLP     := (SELECT id FROM units WHERE name = 'Linear Programming');
 

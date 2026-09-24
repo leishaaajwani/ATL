@@ -32,15 +32,18 @@ mysql -u root -e "CREATE DATABASE atl_nexus CHARACTER SET utf8mb4 COLLATE utf8mb
 ### 3. Load schema, curriculum and demo data
 
 ```bash
-mysql -u atl -pdevpassword atl_nexus < db/schema.sql
-mysql -u atl -pdevpassword atl_nexus < db/curriculum.sql
-mysql -u atl -pdevpassword atl_nexus < db/seeds/005_demo_people.sql
+mysql -u atl -pdevpassword --default-character-set=utf8mb4 atl_nexus < db/schema.sql
+mysql -u atl -pdevpassword --default-character-set=utf8mb4 atl_nexus < db/curriculum.sql
+mysql -u atl -pdevpassword --default-character-set=utf8mb4 atl_nexus < db/seeds/005_demo_people.sql
 ```
 
 `schema.sql` is every table. `curriculum.sql` is the subject list, the five ATL
 categories and 326 sub-skills. `005_demo_people.sql` is optional but
-recommended: it creates fictional staff and students so there is something to
-click through.
+recommended: it creates six demo accounts, each named for what it demonstrates,
+so there is something to click through.
+
+The `--default-character-set=utf8mb4` matters: some MySQL builds default the
+client to latin1, which mangles any accented character in a name on the way in.
 
 ### 4. Configure and run
 
@@ -62,13 +65,17 @@ That starts two processes: Vite on 5173 and the API on 3001, with Vite proxying
 `.env.example` ships with a development login enabled, so the app opens as a
 teacher straight away. A pill in the bottom-right corner switches account.
 
-| Account | Role | What they have |
-|---|---|---|
-| `r.mehta@example.edu` | Teacher | Chemistry DP1, Chemistry MYP4, with units and a student waiting to be confirmed |
-| `f.haddad@example.edu` | Teacher | Math AI DP1, with a reflection waiting to be reviewed |
-| `j.okafor@example.edu` | Student | DP1, one approved reflection and one sent back for revision |
-| `s.tanaka@example.edu` | Student | MYP4, so you can see the MYP sub-skill set |
-| `coordinator@example.edu` | Admin | The roster |
+Each account is named for what it demonstrates, so you can tell from the
+switcher which one to open.
+
+| Account | Shows you |
+|---|---|
+| `teacher1@example.edu` | Chemistry DP1 and MYP4 with units planned, and a student waiting to be confirmed. The place to see subject-specific sub-skills differ by programme. |
+| `teacher2@example.edu` | Math AI DP1, with a reflection waiting to be reviewed. Open Approvals to see the evidence a student attached. |
+| `student1@example.edu` | DP1 with work in both states: one reflection approved, one sent back for revision. |
+| `student2@example.edu` | DP1 who has asked to join a class and is still waiting on the teacher. Shows what a student sees before confirmation. |
+| `student3@example.edu` | MYP4, so the MYP sub-skill set is visible next to the DP one. |
+| `admin@example.edu` | The roster: adding people one at a time or by CSV. |
 
 The choice is held per browser tab, so you can open two tabs and watch the
 student and teacher sides at the same time.
@@ -157,8 +164,9 @@ It creates its own fixtures and cleans up after itself.
 ## A note on the data in this repository
 
 No real staff or student records are committed here. `curriculum.sql` holds
-subjects and sub-skills only, and everyone in `005_demo_people.sql` is invented,
-on `example.edu`, which cannot receive mail or be signed in to.
+subjects and sub-skills only, and the accounts in `005_demo_people.sql` are
+placeholders named for their role, on `example.edu`, which cannot receive mail
+or be signed in to.
 
 The seeded sub-skills are a considered starting set, not curriculum. Chemistry
 and Math AI are written out in full as the worked examples. Before any pilot,

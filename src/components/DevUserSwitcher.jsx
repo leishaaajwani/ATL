@@ -88,7 +88,7 @@ export default function DevUserSwitcher() {
                         <p className="text-xs font-medium text-slate-900">{u.fullName}</p>
                         <p className="text-[10px] text-slate-500">
                           {u.email}
-                          {u.role === 'teacher' && ` · ${u.teaches} classes`}
+                          {u.role === 'teacher' && ` · ${u.teaches} ${u.teaches === 1 ? 'class' : 'classes'}`}
                           {u.role === 'student' && ` · ${u.enrolled} enrolled`}
                         </p>
                       </button>
