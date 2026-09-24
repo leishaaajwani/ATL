@@ -196,7 +196,7 @@ Sent back to you
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                  Only tick the ones you could actually show someone. Pick {threshold}
+                  Only tick the ones you could actually show someone. Pick {threshold}{' '}
                   and the questions below open up.
                 </p>
 
